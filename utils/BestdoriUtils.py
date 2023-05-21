@@ -384,7 +384,7 @@ class Card(object):
         
         result_map = {
             "initial": ({"normal": True, "trained": False}, server),
-            "permanent": ({"normal": True, "trained": False}, server),
+            "permanent": ({"normal": True, "trained": True if self.meta_id_data[card_id]["stat"].get("training") else False}, server),
             "event": ({"normal": True, "trained": True if self.meta_id_data[card_id]["stat"].get("training") else False}, server),
             "limited": ({"normal": True, "trained": True  if self.meta_id_data[card_id]["stat"].get("training") else False}, server),
             "campaign": ({"normal": True, "trained": True  if self.meta_id_data[card_id]["stat"].get("training") else False}, server),
