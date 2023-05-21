@@ -131,7 +131,7 @@ class Download(object):
 download = Download()
 
 
-USE_CACHE = True
+USE_CACHE = False
 
 JP, EN, TW, CN, KR = 0, 1, 2, 3, 4
 
@@ -1193,11 +1193,9 @@ class PlayerState(object):
         `type`: cn/jp
         '''
         url = f"https://bestdori.com/api/player/{type}/{uid}?mode=2"
-        data = json.loads(requests.get(url))
+        data = json.loads(requests.get(url).text)
         result = self.init_img(uid, data, type)
         result.paste(card.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=card.watermark.split()[3])
         return result
 
 player_state = PlayerState()
-
-card.get("查卡 3").show()

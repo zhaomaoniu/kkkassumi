@@ -36,14 +36,14 @@ TODO: 给ImageUtils.text2img()加上字间距的参数
 ```python
 from utils.BestdoriUtils import player_state, card
 
-uid = "1000000000"
+uid = "1006954716"
 server = "cn"
 
 # 获取玩家信息
 player_state.get(uid, server).save(f"{uid}.png")
 
 # 获取卡牌信息
-player_state.get("查卡 xxxx")
+card.get("查卡 1145")
 ```
 
 ## 感谢
