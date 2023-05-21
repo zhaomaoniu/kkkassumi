@@ -14,7 +14,7 @@ from PIL import ImageFont
 from threading import Thread
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from ImageUtils import ImageUtils
+from utils.ImageUtils import ImageUtils
 
 logging.basicConfig(format='[%(levelname)s] %(asctime)s | %(message)s', level=logging.INFO)
 
@@ -35,6 +35,8 @@ class Download(object):
 
     def download_files(self, url, folder_name, file_name):
         file_path = os.path.abspath(f'./data/{folder_name}/{file_name}')
+        if not os.path.exists(os.path.abspath(f'./data/{folder_name}')):
+            os.mkdir(os.path.abspath(f'./data/{folder_name}'))
         try:
             data = requests.get(url, headers = self.headers)
             with open(file_path, 'wb') as f:
