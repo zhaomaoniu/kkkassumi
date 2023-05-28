@@ -1239,7 +1239,7 @@ class Card(object):
         result = ImageUtils.merge_images(imgs, "v", 16, 0, 32, (255, 255, 255, 255))
         draw = ImageDraw.Draw(result)
 
-        ImageUtils.border_text(draw, (4, result.height - 28), "ID: " + id, get_font("grpjp", 24), (0,0,0), (255,255,255))
+        ImageUtils.border_text(draw, (4, result.height - 28), "ID: " + str(id), get_font("grpjp", 24), (0,0,0), (255,255,255))
 
         return result
     
