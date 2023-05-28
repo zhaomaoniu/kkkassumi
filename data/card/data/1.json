@@ -1,0 +1,235 @@
+{
+    "characterId": 1,
+    "rarity": 1,
+    "attribute": "pure",
+    "levelLimit": 20,
+    "resourceSetName": "res001001",
+    "sdResourceName": "sd001001",
+    "episodes": {
+        "entries": [
+            {
+                "episodeId": 1,
+                "episodeType": "standard",
+                "situationId": 1,
+                "scenarioId": "episode001",
+                "appendPerformance": 100,
+                "appendTechnique": 100,
+                "appendVisual": 100,
+                "releaseLevel": 1,
+                "costs": {},
+                "rewards": {
+                    "entries": [
+                        {
+                            "resourceType": "star",
+                            "quantity": 25,
+                            "lbBonus": 1
+                        }
+                    ]
+                },
+                "title": [
+                    "自己紹介",
+                    "Self-Introduction",
+                    "自我介紹",
+                    "自我介绍",
+                    "자기소개"
+                ],
+                "characterId": 1
+            },
+            {
+                "episodeId": 2,
+                "episodeType": "memorial",
+                "situationId": 1,
+                "scenarioId": "memorial001",
+                "appendPerformance": 200,
+                "appendTechnique": 200,
+                "appendVisual": 200,
+                "releaseLevel": 20,
+                "costs": {
+                    "entries": [
+                        {
+                            "resourceId": 4,
+                            "resourceType": "item",
+                            "quantity": 50,
+                            "lbBonus": 1
+                        },
+                        {
+                            "resourceId": 8,
+                            "resourceType": "item",
+                            "quantity": 25,
+                            "lbBonus": 1
+                        }
+                    ]
+                },
+                "rewards": {
+                    "entries": [
+                        {
+                            "resourceType": "star",
+                            "quantity": 50,
+                            "lbBonus": 1
+                        }
+                    ]
+                },
+                "title": [
+                    "私の好きなこと！",
+                    "What I Like!",
+                    "我喜歡的事！",
+                    "我喜欢的东西！",
+                    "내가 좋아하는 일!"
+                ],
+                "characterId": 1
+            }
+        ]
+    },
+    "costumeId": 1608,
+    "gachaText": [
+        null,
+        null,
+        null,
+        null,
+        null
+    ],
+    "prefix": [
+        "猪突猛進っ！",
+        "Reckless!",
+        "莽撞冒進！",
+        "奋不顾身向前冲！",
+        "저돌맹진!"
+    ],
+    "releasedAt": [
+        "1489626000000",
+        "1489658400000",
+        "1489629600000",
+        "1489629600000",
+        "1489626000000"
+    ],
+    "skillName": [
+        "ドキドキ探し中！",
+        "Heart-Pounding Search!",
+        "尋找心跳的感覺！",
+        "寻找心动！",
+        "두근거림을 찾는 중!"
+    ],
+    "skillId": 1,
+    "source": [
+        {},
+        {},
+        {},
+        {},
+        {}
+    ],
+    "type": "initial",
+    "stat": {
+        "1": {
+            "performance": 666,
+            "technique": 861,
+            "visual": 1239
+        },
+        "2": {
+            "performance": 694,
+            "technique": 898,
+            "visual": 1292
+        },
+        "3": {
+            "performance": 725,
+            "technique": 938,
+            "visual": 1350
+        },
+        "4": {
+            "performance": 759,
+            "technique": 982,
+            "visual": 1413
+        },
+        "5": {
+            "performance": 796,
+            "technique": 1029,
+            "visual": 1481
+        },
+        "6": {
+            "performance": 836,
+            "technique": 1080,
+            "visual": 1555
+        },
+        "7": {
+            "performance": 878,
+            "technique": 1135,
+            "visual": 1634
+        },
+        "8": {
+            "performance": 923,
+            "technique": 1193,
+            "visual": 1718
+        },
+        "9": {
+            "performance": 971,
+            "technique": 1255,
+            "visual": 1807
+        },
+        "10": {
+            "performance": 1022,
+            "technique": 1321,
+            "visual": 1902
+        },
+        "11": {
+            "performance": 1076,
+            "technique": 1390,
+            "visual": 2002
+        },
+        "12": {
+            "performance": 1132,
+            "technique": 1463,
+            "visual": 2107
+        },
+        "13": {
+            "performance": 1191,
+            "technique": 1540,
+            "visual": 2217
+        },
+        "14": {
+            "performance": 1253,
+            "technique": 1620,
+            "visual": 2333
+        },
+        "15": {
+            "performance": 1318,
+            "technique": 1704,
+            "visual": 2454
+        },
+        "16": {
+            "performance": 1386,
+            "technique": 1792,
+            "visual": 2580
+        },
+        "17": {
+            "performance": 1457,
+            "technique": 1883,
+            "visual": 2711
+        },
+        "18": {
+            "performance": 1530,
+            "technique": 1978,
+            "visual": 2847
+        },
+        "19": {
+            "performance": 1606,
+            "technique": 2076,
+            "visual": 2989
+        },
+        "20": {
+            "performance": 1685,
+            "technique": 2178,
+            "visual": 3136
+        },
+        "episodes": [
+            {
+                "performance": 100,
+                "technique": 100,
+                "visual": 100
+            },
+            {
+                "performance": 200,
+                "technique": 200,
+                "visual": 200
+            }
+        ]
+    }
+}
