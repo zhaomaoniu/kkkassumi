@@ -1,22 +1,24 @@
-import threading
-import requests
+import asyncio
 import datetime
-import difflib
-import logging
 import json
 import math
-import time
 import os
+import threading
+import time
+from functools import wraps
+from typing import Tuple
 
-from PIL import Image
-from PIL import ImageDraw
-from PIL import ImageFont
+import aiohttp
+import requests
+from PIL import Image, ImageDraw, ImageFont
 from threading import Thread
 from apscheduler.schedulers.background import BackgroundScheduler
+from nonebot.log import logger
 
 from utils.ImageUtils import ImageUtils
 
-logging.basicConfig(format='[%(levelname)s] %(asctime)s | %(message)s', level=logging.INFO)
+USE_CACHE = False
+JP, EN, TW, CN, KR = 0, 1, 2, 3, 4
 
 class Download(object):
     def __init__(self):
@@ -35,8 +37,10 @@ class Download(object):
 
     def download_files(self, url, folder_name, file_name):
         file_path = os.path.abspath(f'./data/{folder_name}/{file_name}')
+
         if not os.path.exists(os.path.abspath(f'./data/{folder_name}')):
             os.mkdir(os.path.abspath(f'./data/{folder_name}'))
+
         try:
             data = requests.get(url, headers = self.headers)
             with open(file_path, 'wb') as f:
@@ -44,14 +48,14 @@ class Download(object):
                 f.close()
             if os.path.getsize(file_path) == 14559:
                 os.remove(file_path)
-                logging.warning("BestdoriImageNotFoundError: " + url)
+                logger.warning("DOWNLOAD: Bestdori图片缺失 " + url)
                 with open(os.path.abspath(f'./cache/BadUrl.txt'), "a") as file:
                     file.write(url + "\n")
             else:
-                logging.info("Downloaded Successfully: " + url)
+                logger.success("DOWNLOAD: 成功下载 " + url)
             self.nowthread -= 1
         except Exception as e:
-            logging.error("Error: ", e)
+            logger.error("DOWNLOAD: ", e)
             self.nowthread -= 1
             return
 
@@ -76,14 +80,14 @@ class Download(object):
                         break
                     else:
                         if self.threadLock.acquire(True):  # 2、获取锁状态，一个线程有锁时，别的线程只能在外面等着
-                            # logging.info(str(self.nowthread) + " thread in running")
+                            # logger.info(str(self.nowthread) + " thread in running")
                             # 注意，上面的nowthread的输出值可能为if表达式成功时的值，这是因为线程运行的随机性，因为在判断if时的该值和在print时的该值可能因为线程运行缘故导致不同
                             # 这里的nowthread值仅能提示在print这一瞬间有几个线程还在运行，没有结束
                             # print需要上线程锁，否则可能会和线程函数的print产生冲突导致输出错乱（）即一个print执行到一半，另一个print开始执行，结果是两个print的输出值混在一起
                             self.threadLock.release()  # 3、释放锁
             # except Exception as e:
             #     errorMsg='start new thread to downLoad error:\n'+str(e)
-            #     logging.error(errorMsg)
+            #     logger.error(errorMsg)
 
     
     def download_cards_thumb(self, li, server_dict):
@@ -101,11 +105,11 @@ class Download(object):
                         break
                     else:
                         if self.threadLock.acquire(True): 
-                            # logging.info(str(self.nowthread) + " thread in running")
+                            # logger.info(str(self.nowthread) + " thread in running")
                             self.threadLock.release()
             # except Exception as e:
             #     errorMsg='start new thread to downLoad error:\n'+str(e)
-            #     logging.error(errorMsg)
+            #     logger.error(errorMsg)
 
     def download_degrees(self, li, server):
         __url = f"https://bestdori.com/assets/{server}/thumb/degree_rip/"
@@ -122,34 +126,284 @@ class Download(object):
                         break
                     else:
                         if self.threadLock.acquire(True):
-                            # logging.info(str(self.nowthread) + " thread in running")
+                            # logger.info(str(self.nowthread) + " thread in running")
                             self.threadLock.release()
             except Exception as e:
-                errorMsg='start new thread to downLoad error:\n'+str(e)
-                logging.error(errorMsg)
+                errorMsg='DOWNLOAD: '+str(e)
+                logger.error(errorMsg)
                 
 download = Download()
 
 
-USE_CACHE = False
-
-JP, EN, TW, CN, KR = 0, 1, 2, 3, 4
-
-
 if USE_CACHE:
-    logging.info("GLOBAL: 将使用CACHE")
+    logger.info("GLOBAL: 将使用CACHE")
 else:
-    logging.info("GLOBAL: 将不使用CACHE")
+    logger.info("GLOBAL: 将不使用CACHE")
 
 
-class Card(object):
+def get_font(name: str, size: int):
+    '''
+    获取ImageFont.truetype字体
+
+    `name`: `ksm`/`grpcn`/`grpjp`
+
+    `size`: 字体大小
+    '''
+    path = {
+        "ksm": os.path.abspath("data/fonts/KasumiFont.ttf"),
+        "grpcn": os.path.abspath("data/fonts/GB18030.ttf"),
+        "grpjp": os.path.abspath("data/fonts/TT-Shin Go M.ttf")
+    }
+    return ImageFont.truetype(path[name], size)
+
+def check_initialized(func):
+    '''
+    装饰器函数：检查对象是否已初始化
+    '''
+    @wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        if not self.initialized:
+            raise RuntimeError("函数在执行 initialize() 之前不能调用！")
+        return await func(self, *args, **kwargs)
+    
+    return wrapper
+
+
+class _Card:
+    '''
+    卡牌信息获取
+    '''
+
     def __init__(self):
-        self.FONT_PATH = os.path.abspath("data/fonts/KasumiFont.ttf")
-        self.FONT_PATH_BANDORI = os.path.abspath("data/fonts/GB18030.ttf")
-        self.FONT_PATH_BANDORI_JP = os.path.abspath("data/fonts/TT-Shin Go M.ttf")
-        self.FONT = ImageFont.truetype(font=self.FONT_PATH, size = 48)
-        logging.info("CARD: 字体加载成功")
+        self.initialized = False
 
+    async def initialize(self):
+        logger.info("DATA.CARD: 正在初始化")
+
+        await self._get_data()
+        await self._load_imgs()
+        await self._load_texts()
+
+        self._scheduler = BackgroundScheduler()
+        self._scheduler.add_job(self._get_data, 'interval', hours=1)
+        self._scheduler.start()
+
+        logger.success("DATA.CARD: 成功初始化")
+        self.initialized = True
+
+    async def _get_data(self):
+        if not USE_CACHE:
+            summary_url = "https://bestdori.com/api/cards/all.5.json"
+            self.__summary_data__: dict = json.loads(requests.get(summary_url).text)
+        else:
+            with open(os.path.abspath("./cache/all.5.json"), 'r', encoding="UTF-8") as f: self.__summary_data__: dict = json.load(f)
+        logger.success("DATA.CARD: 成功获取卡牌简略数据")
+
+        self.__processed_data__ = {k: v for k, v in self.__summary_data__.items() if int(k) < 5001 and v["type"] != "others"}
+        for k, v in self.__processed_data__.items():
+            self.__processed_data__[k]["bandId"] = (v["characterId"] - 1) // 5 + 1
+
+        path = os.path.abspath("./data/card/data")
+
+        # 先判断有没有卡牌更新
+        names = []
+        for root, dirs, files in os.walk(path):
+            names += (files)
+
+        card_names = {name[:-5] for name in names}
+
+        updated_cards = set(self.__summary_data__.keys()) - card_names
+
+        if updated_cards:
+            # 如果有卡牌更新
+            logger.info(f"DATA.CARD: 日服卡牌数据更新 {updated_cards}")
+            await self._update_card_data(updated_cards)
+        
+        updated_cards = set()
+
+        # 再检查国服有没有更新
+        # 这里使用`prefix`判断
+        logger.info("DATA.CARD: 校验数据中")
+        for card_id in self.__summary_data__.keys():
+            if os.path.exists(f'{path}/{card_id}.json'):
+                with open(f'{path}/{card_id}.json', 'r', encoding="UTF-8") as f:
+                    card_data: dict = json.load(f)
+                    if not card_data["prefix"][CN] and self.__summary_data__[card_id]["prefix"][CN]:
+                        updated_cards.add(card_id)
+            else:
+                updated_cards.add(card_id)
+        logger.info("DATA.CARD: 数据校验结束")
+
+        if updated_cards:
+            # 如果有国服更新
+            logger.info(f"DATA.CARD: 国服卡牌数据更新 {updated_cards}")
+            await self._update_card_data(updated_cards)
+
+        # 更新立绘、缩略图
+        await self._update_card_img()
+
+    async def _fetch_card_data(self, session, card_id):
+        url = f"https://bestdori.com/api/cards/{card_id}.json"
+        async with session.get(url) as response:
+            return card_id, await response.json()
+
+    async def _update_card_data(self, updated_cards):
+        async with aiohttp.ClientSession() as session:
+            tasks = [self._fetch_card_data(session, card_id) for card_id in updated_cards]
+            card_data_list = await asyncio.gather(*tasks)
+            for card_id, card_data in card_data_list:
+                logger.success(f"DATA.CARD: 成功获取 {card_id} 的详细数据")
+                await asyncio.sleep(0.05)
+                with open(os.path.abspath(f"./data/card/data/{card_id}.json"), "w", encoding="UTF-8") as json_file:
+                    json.dump(card_data, json_file, ensure_ascii=False, indent=4)
+
+    async def _update_card_img(self):
+        res, res_thumb, server_dict = [], [], {}
+        
+        bad_res, bad_res_thumb = await self._get_bad_res()
+
+        for i,v in self.__summary_data__.items():
+            res_data, server = await self._get_res_info(i)
+            server_dict[v["resourceSetName"]] = server
+            if res_data["normal"]:
+                res.append(f'{v["resourceSetName"]}_card_normal.png')
+                res_thumb.append(f'{v["resourceSetName"]}_normal.png')
+            if res_data["trained"]:
+                res.append(f'{v["resourceSetName"]}_card_after_training.png')  
+                res_thumb.append(f'{v["resourceSetName"]}_after_training.png')
+
+        _miss_cards = list(set(res).difference(set(await self._get_file_name(os.path.abspath(f'./data/card/cards')))))
+        _miss_cards_thumb = list(set(res_thumb).difference(set(os.listdir(os.path.abspath(f'./data/card/cards_thumb')))))
+
+        miss_cards, miss_cards_thumb = [], []
+
+        for v in _miss_cards:
+            if v not in bad_res:
+                miss_cards.append(v)
+
+        for v in _miss_cards_thumb:
+            if v not in bad_res_thumb:
+                miss_cards_thumb.append(await self._res2id(v[:9]) + "_" + v)
+
+        if len(miss_cards) > 0 :
+            logger.warning(f"DATA.CARD: 卡面资源未下载: {miss_cards}")
+            logger.info("DATA.CARD: 开始尝试下载卡面资源")
+            download.download_cards(miss_cards, server_dict)
+        else:
+            logger.info("DATA.CARD: 卡面资源加载成功")
+
+        if len(miss_cards_thumb) > 0 :
+            logger.warning(f"DATA.CARD: 缩略图资源未下载: {miss_cards_thumb}")
+            logger.info("DATA.CARD: 开始尝试下载缩略图资源")
+            download.download_cards_thumb(miss_cards_thumb, server_dict)
+        else:
+            logger.info("DATA.CARD: 缩略图资源加载成功")
+
+    async def _get_file_name(self, file_dir):
+        names = []
+        for root, dirs, files in os.walk(file_dir):
+            names += files
+        return names
+    
+    async def _get_bad_res(self) -> tuple:
+        res_lst = []
+        id_lst = []
+        for s in download.get_bad_url():
+            if 'characters' in s:
+                res_id = s.split('/')[7].split('_')[0][3:]
+                if 'after_training' in s:
+                    res_lst.append(f'res{res_id}_card_after_training.png')
+                elif 'normal' in s:
+                    res_lst.append(f'res{res_id}_card_normal.png')
+            elif 'thumb' in s:
+                res_id = s.split('/')[-1].split('_')[0]
+                if 'normal' in s:
+                    id_lst.append(f'{res_id}_normal.png')
+                elif 'after_training' in s:
+                    id_lst.append(f'{res_id}_after_training.png')
+        return res_lst, id_lst
+
+    async def _get_res_info(self, card_id: int) -> tuple:
+        card_id = str(card_id)
+        type = self.__summary_data__[card_id]["type"]
+        server = "jp"
+        for i in [0, 3, 2, 1, 4]:
+            if self.__summary_data__[card_id]["prefix"][i]:
+                server = ["jp", "en", "tw", "cn", "kr"][i]
+                break
+        
+        result_map = {
+            "initial": ({"normal": True, "trained": False}, server),
+            "permanent": ({"normal": True, "trained": True if self.__summary_data__[card_id]["stat"].get("training") else False}, server),
+            "event": ({"normal": True, "trained": True if self.__summary_data__[card_id]["stat"].get("training") else False}, server),
+            "limited": ({"normal": True, "trained": True  if self.__summary_data__[card_id]["stat"].get("training") else False}, server),
+            "campaign": ({"normal": True, "trained": True  if self.__summary_data__[card_id]["stat"].get("training") else False}, server),
+            "others": ({"normal": True if self.__summary_data__[card_id]["stat"].get("training") else False, "trained": True}, server),
+            "dreamfes": ({"normal": True, "trained": True}, server),
+            "birthday": ({"normal": False, "trained": True}, server),
+            "kirafes": ({"normal": False, "trained": True}, server)
+        }
+
+        return result_map[type]
+
+    async def _res2id(self, res: str):
+        for k,v in self.__summary_data__.items():
+            if v["resourceSetName"] == res:
+                return k
+
+    async def _load_imgs(self):
+        self.attribute_img = {
+            'cool': Image.open(os.path.abspath(f'./data/card/attribute/cool.png')).convert("RGBA"),
+            'happy': Image.open(os.path.abspath(f'./data/card/attribute/happy.png')).convert("RGBA"),
+            'powerful': Image.open(os.path.abspath(f'./data/card/attribute/powerful.png')).convert("RGBA"),
+            'pure': Image.open(os.path.abspath(f'./data/card/attribute/pure.png')).convert("RGBA")
+        }
+        self.attribute_thumb_img = {
+            'cool': self.attribute_img["cool"].resize((45, 45), Image.Resampling.LANCZOS).convert("RGBA"),
+            'happy': self.attribute_img["happy"].resize((45, 45), Image.Resampling.LANCZOS).convert("RGBA"),
+            'powerful': self.attribute_img["powerful"].resize((45, 45), Image.Resampling.LANCZOS).convert("RGBA"),
+            'pure': self.attribute_img["pure"].resize((45, 45), Image.Resampling.LANCZOS).convert("RGBA")
+        }
+        self.star_img = Image.open(os.path.abspath(f'./data/card/star/star.png')).convert("RGBA")
+        self.star_normal_img = Image.open(os.path.abspath(f'./data/card/star/star_normal.png')).convert("RGBA")
+        self.star_thumb_img = self.star_img.resize((28, 28), Image.Resampling.LANCZOS)#.convert("RGBA")
+        self.star_normal_thumb_img = self.star_normal_img.resize((28, 28), Image.Resampling.LANCZOS)#.convert("RGBA")
+        self.frame_img = {
+            "1_cool": Image.open(os.path.abspath(f'./data/bg/frame_1_cool.png')).convert("RGBA"),
+            "1_happy": Image.open(os.path.abspath(f'./data/bg/frame_1_happy.png')).convert("RGBA"),
+            "1_powerful": Image.open(os.path.abspath(f'./data/bg/frame_1_powerful.png')).convert("RGBA"),
+            "1_pure": Image.open(os.path.abspath(f'./data/bg/frame_1_pure.png')).convert("RGBA"),
+            "2": Image.open(os.path.abspath(f'./data/bg/frame_2.png')).convert("RGBA"),
+            "3": Image.open(os.path.abspath(f'./data/bg/frame_3.png')).convert("RGBA"),
+            "4": Image.open(os.path.abspath(f'./data/bg/frame_4.png')).convert("RGBA"),
+            "5": Image.open(os.path.abspath(f'./data/bg/frame_5.png')).convert("RGBA"),
+        }        
+        self.frame_large_img = {
+            "1_cool": Image.open(os.path.abspath(f'./data/card/res/frame_1_cool.png')).convert("RGBA"),
+            "1_happy": Image.open(os.path.abspath(f'./data/card/res/frame_1_happy.png')).convert("RGBA"),
+            "1_powerful": Image.open(os.path.abspath(f'./data/card/res/frame_1_powerful.png')).convert("RGBA"),
+            "1_pure": Image.open(os.path.abspath(f'./data/card/res/frame_1_pure.png')).convert("RGBA"),
+            "2": Image.open(os.path.abspath(f'./data/card/res/frame_2.png')).convert("RGBA"),
+            "3": Image.open(os.path.abspath(f'./data/card/res/frame_3.png')).convert("RGBA"),
+            "4": Image.open(os.path.abspath(f'./data/card/res/frame_4.png')).convert("RGBA"),
+            "5": Image.open(os.path.abspath(f'./data/card/res/frame_5.png')).convert("RGBA"),
+        }
+        self.band_img = {
+            "1": Image.open(os.path.abspath(f'./data/bg/poppinparty.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
+            "2": Image.open(os.path.abspath(f'./data/bg/afterglow.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
+            "3": Image.open(os.path.abspath(f'./data/bg/hellohappyworld.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
+            "4": Image.open(os.path.abspath(f'./data/bg/pastelpalettes.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
+            "5": Image.open(os.path.abspath(f'./data/bg/roselia.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
+            "6": Image.open(os.path.abspath(f'./data/bg/morfonica.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
+            "7": Image.open(os.path.abspath(f'./data/bg/raiseasuilen.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA")
+        }
+        self.thumb_bg = Image.open(os.path.abspath(f'./data/bg/thumb_bg.png')).convert("RGBA")
+        self.gr_img = Image.open(os.path.abspath(f'./data/bg/gr.png')).convert("RGBA")
+        self.level_img = Image.open(os.path.abspath(f'./data/bg/level.png')).convert("RGBA")
+        self.watermark = Image.open(os.path.abspath(f'./data/bg/watermark.png')).convert("RGBA")
+        logger.success("DATA.CARD: 图片加载成功")
+
+    async def _load_texts(self):
         self.characterId2name = {
             '1': ['戸山 香澄', '戸山香澄', 'kasumi toyama', 'kasumitoyama', '戶山 香澄', '戶山香澄', '户山 香澄', '户山香澄', '香 澄', 'kasumi', '猫', '香澄', '戸山', 'toyama', '戶山', '户山', 'ksm', 'cdd', 'dd', '猫猫头', '猫耳', '香香', '小香', '澄澄', '小香澄', '吉太'],
             '2': ['花園 たえ', '花園たえ', 'tae hanazono', 'taehanazono', '花園 多惠', '花園多惠', '花园 多 惠', '花园多惠', 'たえ', 'tae', '多惠', '花園', 'hanazono', '花園', '花园', 'otae', '惠惠', '多英', '小花', '小惠', '铁 头'],
@@ -225,245 +479,218 @@ class Card(object):
         self.attribute_list = [x for v in self.chinese2attribute.values() for x in v]
         self.rarity_list = [x for v in self.chinese2rarity.values() for x in v]
         self.type_list = [x for v in self.chinese2type.values() for x in v]
+        logger.success("DATA.CARD: 文本数据加载成功")
 
-        self.get_data()
-        
-        self.attribute_img = {
-            'cool': Image.open(os.path.abspath(f'./data/card/attribute/cool.png')).convert("RGBA"),
-            'happy': Image.open(os.path.abspath(f'./data/card/attribute/happy.png')).convert("RGBA"),
-            'powerful': Image.open(os.path.abspath(f'./data/card/attribute/powerful.png')).convert("RGBA"),
-            'pure': Image.open(os.path.abspath(f'./data/card/attribute/pure.png')).convert("RGBA")
-        }
-        self.attribute_thumb_img = {
-            'cool': self.attribute_img["cool"].resize((45, 45), Image.Resampling.LANCZOS).convert("RGBA"),
-            'happy': self.attribute_img["happy"].resize((45, 45), Image.Resampling.LANCZOS).convert("RGBA"),
-            'powerful': self.attribute_img["powerful"].resize((45, 45), Image.Resampling.LANCZOS).convert("RGBA"),
-            'pure': self.attribute_img["pure"].resize((45, 45), Image.Resampling.LANCZOS).convert("RGBA")
-        }
-        self.star_img = Image.open(os.path.abspath(f'./data/card/star/star.png')).convert("RGBA")
-        self.star_normal_img = Image.open(os.path.abspath(f'./data/card/star/star_normal.png')).convert("RGBA")
-        self.star_thumb_img = self.star_img.resize((24, 24), Image.Resampling.LANCZOS)#.convert("RGBA")
-        self.star_normal_thumb_img = self.star_normal_img.resize((24, 24), Image.Resampling.LANCZOS)#.convert("RGBA")
-        self.frame_img = {
-            "1_cool": Image.open(os.path.abspath(f'./data/bg/frame_1_cool.png')).convert("RGBA"),
-            "1_happy": Image.open(os.path.abspath(f'./data/bg/frame_1_happy.png')).convert("RGBA"),
-            "1_powerful": Image.open(os.path.abspath(f'./data/bg/frame_1_powerful.png')).convert("RGBA"),
-            "1_pure": Image.open(os.path.abspath(f'./data/bg/frame_1_pure.png')).convert("RGBA"),
-            "2": Image.open(os.path.abspath(f'./data/bg/frame_2.png')).convert("RGBA"),
-            "3": Image.open(os.path.abspath(f'./data/bg/frame_3.png')).convert("RGBA"),
-            "4": Image.open(os.path.abspath(f'./data/bg/frame_4.png')).convert("RGBA"),
-            "5": Image.open(os.path.abspath(f'./data/bg/frame_5.png')).convert("RGBA"),
-        }        
-        self.frame_large_img = {
-            "1_cool": Image.open(os.path.abspath(f'./data/card/res/frame_1_cool.png')).convert("RGBA"),
-            "1_happy": Image.open(os.path.abspath(f'./data/card/res/frame_1_happy.png')).convert("RGBA"),
-            "1_powerful": Image.open(os.path.abspath(f'./data/card/res/frame_1_powerful.png')).convert("RGBA"),
-            "1_pure": Image.open(os.path.abspath(f'./data/card/res/frame_1_pure.png')).convert("RGBA"),
-            "2": Image.open(os.path.abspath(f'./data/card/res/frame_2.png')).convert("RGBA"),
-            "3": Image.open(os.path.abspath(f'./data/card/res/frame_3.png')).convert("RGBA"),
-            "4": Image.open(os.path.abspath(f'./data/card/res/frame_4.png')).convert("RGBA"),
-            "5": Image.open(os.path.abspath(f'./data/card/res/frame_5.png')).convert("RGBA"),
-        }
-        self.band_img = {
-            "1": Image.open(os.path.abspath(f'./data/bg/poppinparty.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
-            "2": Image.open(os.path.abspath(f'./data/bg/afterglow.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
-            "3": Image.open(os.path.abspath(f'./data/bg/hellohappyworld.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
-            "4": Image.open(os.path.abspath(f'./data/bg/pastelpalettes.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
-            "5": Image.open(os.path.abspath(f'./data/bg/roselia.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
-            "6": Image.open(os.path.abspath(f'./data/bg/morfonica.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA"),
-            "7": Image.open(os.path.abspath(f'./data/bg/raiseasuilen.png')).resize((256, 112), Image.Resampling.BILINEAR).convert("RGBA")
-        }
-        self.thumb_bg = Image.open(os.path.abspath(f'./data/bg/thumb_bg.png')).convert("RGBA")
-        self.gr_img = Image.open(os.path.abspath(f'./data/bg/gr.png')).convert("RGBA")
-        self.level_img = Image.open(os.path.abspath(f'./data/bg/level.png')).convert("RGBA")
-        self.watermark = Image.open(os.path.abspath(f'./data/bg/watermark.png')).convert("RGBA")
-        logging.info("CARD: 图片读取成功")
 
-        self.scheduler = BackgroundScheduler()
-        self.scheduler.add_job(self.get_data, 'interval', hours=1)
-        self.scheduler.start()
-        logging.info("CARD: 添加定时任务成功，将每小时更新一次数据")
+    # 文字数据获取
 
-    def get_data(self):
-        url_skill = "https://bestdori.com/api/skills/all.10.json"
-        url_all = "https://bestdori.com/api/cards/all.5.json"
-        if USE_CACHE:
-            with open(os.path.abspath("./cache/all.10.json"), 'r', encoding="UTF-8") as f:
-                self.skills: dict = json.load(f)
-            with open(os.path.abspath("./cache/all.5.json"), 'r', encoding="UTF-8") as f:
-                self.meta_id_data: dict = json.load(f)
-        else:
-            self.skills: dict = json.loads(requests.get(url_skill).text)
-            self.meta_id_data: dict = json.loads(requests.get(url_all).text)
-        
-        self.id_data = {k: v for k, v in self.meta_id_data.items() if (int(k) < 5001 and v["type"] != "others")}
-        for k, v in self.id_data.items():
-            self.id_data[k]["bandId"] = (v["characterId"] - 1) // 5 + 1
-        # self.id_data = {k: v for k, v in id_data.items() if v["type"] != "others"}
-        logging.info("CARD: 数据获取成功")
+    @check_initialized
+    async def get_data(self, card_id: int) -> dict:
+        '''
+        获取卡牌对应的详细信息
+        '''
+        with open(os.path.abspath(f"./data/card/data/{card_id}.json"), 'r', encoding="UTF-8") as f: 
+            data: dict = json.load(f)
+        return data
 
-        self.res, self.res_thumb, server_dict = [], [], {}
-        
-        bad_res, bad_res_thumb = self.get_bad_res()
-
-        for i,v in self.meta_id_data.items():
-            res_data, server = self.get_res_data(i)
-            server_dict[v["resourceSetName"]] = server
-            if res_data["normal"]:
-                self.res.append(f'{v["resourceSetName"]}_card_normal.png')
-                self.res_thumb.append(f'{v["resourceSetName"]}_normal.png')
-            if res_data["trained"]:
-                self.res.append(f'{v["resourceSetName"]}_card_after_training.png')  
-                self.res_thumb.append(f'{v["resourceSetName"]}_after_training.png')
-
-        self.__miss_cards = list(set(self.res).difference(set(self.get_file_name(os.path.abspath(f'./data/card/cards')))))
-        self.__miss_cards_thumb = list(set(self.res_thumb).difference(set(os.listdir(os.path.abspath(f'./data/card/cards_thumb')))))
-
-        self.miss_cards, self.miss_cards_thumb = [], []
-
-        for v in self.__miss_cards:
-            if v not in bad_res:
-                self.miss_cards.append(v)
-
-        for v in self.__miss_cards_thumb:
-            if v not in bad_res_thumb:
-                self.miss_cards_thumb.append(self.res2id(v[:9]) + "_" + v)
-
-        if len(self.miss_cards) > 0 :
-            logging.warning(f"CARD: 卡面资源未下载: {self.miss_cards}")
-            logging.info("CARD: 开始尝试下载卡面资源")
-            download.download_cards(self.miss_cards, server_dict)
-        else:
-            logging.info("CARD: 卡面资源加载成功")
-
-        if len(self.miss_cards_thumb) > 0 :
-            logging.warning(f"CARD: 缩略图资源未下载: {self.miss_cards_thumb}")
-            logging.info("CARD: 开始尝试下载缩略图资源")
-            download.download_cards_thumb(self.miss_cards_thumb, server_dict)
-        else:
-            logging.info("CARD: 缩略图资源加载成功")
-
-    def get_file_name(self, file_dir):
-        names = []
-        for root, dirs, files in os.walk(file_dir):
-            names += files
-        return names
+    @check_initialized
+    async def get_character_id(self, card_id: int) -> int:
+        '''
+        获取卡牌对应的角色ID
+        '''
+        return (await self.get_data(card_id))["characterId"]
     
-    def timestamp_to_datetime(self, timestamp: int) -> str:
-        if timestamp:
-            timestamp = int(timestamp) / 1000  # 转换为秒级时间戳
-            dt = datetime.datetime.fromtimestamp(timestamp)
-            chinese_datetime = dt.strftime("%#m月%#d日%Y年, %I:%M %p")
-            return chinese_datetime
+    @check_initialized
+    async def get_band_id(self, card_id: int) -> int:
+        '''
+        获取卡牌对应的乐团ID
+        '''
+        return (await self.get_character_id(card_id) - 1) // 5 + 1
     
-    def get_bad_res(self) -> tuple:
-        res_lst = []
-        id_lst = []
-        for s in download.get_bad_url():
-            if 'characters' in s:
-                res_id = s.split('/')[7].split('_')[0][3:]
-                if 'after_training' in s:
-                    res_lst.append(f'res{res_id}_card_after_training.png')
-                elif 'normal' in s:
-                    res_lst.append(f'res{res_id}_card_normal.png')
-            elif 'thumb' in s:
-                res_id = s.split('/')[-1].split('_')[0]
-                if 'normal' in s:
-                    id_lst.append(f'{res_id}_normal.png')
-                elif 'after_training' in s:
-                    id_lst.append(f'{res_id}_after_training.png')
-        return res_lst, id_lst
-
-    def get_res_data(self, card_id: str) -> tuple:
-        type = self.meta_id_data[card_id]["type"]
-        server = "jp"
-        for i in [0, 3, 2, 1, 4]:
-            if self.meta_id_data[card_id]["prefix"][i]:
-                server = ["jp", "en", "tw", "cn", "kr"][i]
-                break
-        
-        result_map = {
-            "initial": ({"normal": True, "trained": False}, server),
-            "permanent": ({"normal": True, "trained": True if self.meta_id_data[card_id]["stat"].get("training") else False}, server),
-            "event": ({"normal": True, "trained": True if self.meta_id_data[card_id]["stat"].get("training") else False}, server),
-            "limited": ({"normal": True, "trained": True  if self.meta_id_data[card_id]["stat"].get("training") else False}, server),
-            "campaign": ({"normal": True, "trained": True  if self.meta_id_data[card_id]["stat"].get("training") else False}, server),
-            "others": ({"normal": True if self.meta_id_data[card_id]["stat"].get("training") else False, "trained": True}, server),
-            "dreamfes": ({"normal": True, "trained": True}, server),
-            "birthday": ({"normal": False, "trained": True}, server),
-            "kirafes": ({"normal": False, "trained": True}, server)
-        }
-
-        return result_map[type]
-
-    def res2id(self, res: str):
-        for k,v in self.meta_id_data.items():
-            if v["resourceSetName"] == res:
-                return k
-
-    def to_width(self, string: str) -> int:
+    @check_initialized
+    async def get_rarity(self, card_id: int) -> int:
         '''
-        获取字符串宽度
+        获取卡牌对应的稀有度
         '''
-        return math.ceil(self.FONT.getlength(string))
+        return (await self.get_data(card_id))["rarity"]
 
-    def fuzzy_match(self, s, d):
-        matches = []
-        for key, values in d.items():
-            match = difflib.get_close_matches(s, values)
-            if match:
-                ratio = difflib.SequenceMatcher(None, s, match[0]).ratio()
-                matches.append([key, ratio])
-        return sorted(matches, key=lambda x: x[1], reverse=True)[0][0] if matches != [] else 0
+    @check_initialized
+    async def get_attribute(self, card_id: int) -> str:
+        '''
+        获取卡牌对应的属性
+        '''
+        return (await self.get_data(card_id))["attribute"]
 
-    def get_character_ids(self, character_name: str):
+    @check_initialized
+    async def get_type(self, card_id: int) -> str:
         '''
-        获取角色id
+        获取卡牌对应的类型
         '''
-        result = []
-        find_character = False
-        for character in self.characterId2name.keys():
-            if character_name in self.characterId2name[character]:
-                find_character = True
-                result.append(character)
-        if find_character == False:
-            result.append(self.fuzzy_match(character_name, self.characterId2name))
-        return result
+        return (await self.get_data(card_id))["type"]
+
+    @check_initialized
+    async def get_level_limit(self, card_id: int) -> int:
+        '''
+        获取卡牌对应的等级上限
+        '''
+        return (await self.get_data(card_id))["levelLimit"]
+
+    @check_initialized
+    async def get_resource_set_name(self, card_id: int) -> str:
+        '''
+        获取卡牌对应的资源集名称
+        '''
+        return (await self.get_data(card_id))["resourceSetName"]
+
+    @check_initialized
+    async def get_sd_resource_name(self, card_id: int) -> str:
+        '''
+        获取卡牌对应的SD资源名称
+        '''
+        return (await self.get_data(card_id))["sdResourceName"]
+
+    @check_initialized
+    async def get_episodes(self, card_id: int) -> list:
+        '''
+        获取卡牌对应的故事列表
+        '''
+        if card_id > 5000:
+            raise ValueError(f"{card_id} 没有对应的故事列表")
+        return (await self.get_data(card_id))["episodes"]["entries"]
+
+    @check_initialized
+    async def get_episode_title(self, card_id: int) -> Tuple[list]:
+        '''
+        获取卡牌故事的标题列表
+        '''
+        episodes = await self.get_episodes(card_id)
+        return episodes[0]["title"], episodes[1]["title"]
+
+    @check_initialized
+    async def get_costume_id(self, card_id: int) -> int:
+        '''
+        获取卡牌对应的服装ID
+        '''
+        return (await self.get_data(card_id))["costumeId"]
+
+    @check_initialized
+    async def get_gacha_text(self, card_id: int) -> list:
+        '''
+        获取卡牌对应的招募文本
+        '''
+        return (await self.get_data(card_id))["gachaText"]
+
+    @check_initialized
+    async def get_prefix(self, card_id: int) -> list:
+        '''
+        获取卡牌对应的名称
+        '''
+        return (await self.get_data(card_id))["prefix"]
+
+    @check_initialized
+    async def get_released_at(self, card_id: int) -> list:
+        '''
+        获取卡牌对应的发布日期
+        '''
+        return (await self.get_data(card_id))["releasedAt"]
+
+    @check_initialized
+    async def get_skill_name(self, card_id: int) -> list:
+        '''
+        获取卡牌对应的技能名称
+        '''
+        return (await self.get_data(card_id))["skillName"]
+
+    @check_initialized
+    async def get_skill_id(self, card_id: int) -> int:
+        '''
+        获取卡牌对应的技能ID
+        '''
+        return (await self.get_data(card_id))["skillId"]
+
+    @check_initialized
+    async def get_source(self, card_id: int) -> list:
+        '''
+        获取卡牌对应的来源
+        '''
+        return (await self.get_data(card_id))["source"]
     
-    def get_band_ids(self, band_name: str):
+    @check_initialized
+    async def get_trained_level(self, card_id: int) -> str:
+        '''
+        获取卡牌特训后的等级
+        '''
+        level_limit = await self.get_level_limit(card_id)
+        level_limit_train = (await self.get_data(card_id)).get("stat", {}).get("training", {}).get("levelLimit", 0)
+        return str(level_limit + level_limit_train)
+
+    @check_initialized
+    async def get_stat(self, card_id: int) -> dict:
+        '''
+        获取卡牌对应的综合力
+        '''
+        return (await self.get_data(card_id))["stat"]
+    
+    @check_initialized
+    async def get_level_stat(self, card_id: int, level: str, trained: bool) -> dict:
+        '''
+        获取卡牌对应等级的综合力
+        '''
+        stats = await self.get_stat(card_id)
+        if level not in stats:
+            raise ValueError(f"{card_id} 不存在 {level} 等级")
+
+        level_stat = stats[level]
+        total_stat = sum(level_stat.values())
+
+        if stats.get("episodes"):
+            episodes_stat = stats["episodes"]
+            level_stat["performance"] += episodes_stat[0]["performance"] + episodes_stat[1]["performance"]
+            level_stat["technique"] += episodes_stat[0]["technique"] + episodes_stat[1]["technique"]
+            level_stat["visual"] += episodes_stat[0]["visual"] + episodes_stat[1]["visual"]
+            total_stat += sum(stats["episodes"][0].values()) + sum(stats["episodes"][1].values())
+
+        if trained:
+            training_stat = stats["training"]
+            level_stat["performance"] += training_stat["performance"]
+            level_stat["technique"] += training_stat["technique"]
+            level_stat["visual"] += training_stat["visual"]
+            training_stat["levelLimit"] = 0
+            training_total = sum(training_stat.values())
+            total_stat += training_total
+
+        level_stat["total"] = total_stat
+        return level_stat
+    
+    @check_initialized
+    async def get_max_stat(self, card_id: int) -> dict:
+        '''
+        获取卡牌的最大综合力
+        '''
+        return await self.get_level_stat(card_id, await self.get_trained_level(card_id), True)
+
+    @check_initialized
+    async def get_character_ids(self, character_name: str):
+        return [character for character in self.characterId2name.keys() if character_name in self.characterId2name[character]]
+    
+    @check_initialized
+    async def get_band_ids(self, band_name: str):
         return [band for band in self.band2name.keys() if band_name in self.band2name[band]]
 
-    def get_attribute_types(self, attribute_ch: str):
+    @check_initialized
+    async def get_attribute_types(self, attribute_ch: str):
         return [attribute for attribute in self.chinese2attribute.keys() if attribute_ch in self.chinese2attribute[attribute]]
 
-    def get_rarities(self, rarity_ch: str):
+    @check_initialized
+    async def get_rarities(self, rarity_ch: str):
         return [rarity for rarity in self.chinese2rarity.keys() if rarity_ch in self.chinese2rarity[rarity]]
             
-    def get_types(self, type_ch: str):
+    @check_initialized
+    async def get_types(self, type_ch: str):
         return [type for type in self.chinese2type.keys() if type_ch in self.chinese2type[type]]
 
-    def get_skill(self, id :str) -> str:
-        '''
-        获取技能描述
-        `id`: skillId
-        '''
-        description: str = self.skills[id]["description"][CN] if self.skills[id]["description"][CN] else self.skills[id]["description"][JP]
-        duration: str = "/".join([str(i) for i in self.skills[id]["duration"]])
-        if self.skills[id].get("onceEffect"):
-            onceEffectValue: str = str(self.skills[id]["onceEffect"]["onceEffectValue"][CN]) if self.skills[id]["onceEffect"]["onceEffectValue"][CN] else str(self.skills[id]["onceEffect"]["onceEffectValue"][JP])
-            return description.format(onceEffectValue, duration)
-        else:
-            return description.format(duration)
-
-    def get_power(self, id: str, level: str, trainingStatus: str) -> int:
-        base_power = 0
-        if self.id_data[id]["stat"].get(level):
-            base_power = self.id_data[id]["stat"][level]["performance"] + self.id_data[id]["stat"][level]["technique"] + self.id_data[id]["stat"][level]["visual"]
-        if trainingStatus == "done":
-            return base_power + self.id_data[id]["stat"]["training"]["performance"] + self.id_data[id]["stat"]["training"]["technique"] + self.id_data[id]["stat"]["training"]["visual"]
-        return base_power
-
-    def get_card_id(self, mode: str, keywords: list) -> list:
+    @check_initialized
+    async def get_card_id(self, mode: str, keywords: list) -> list:
         '''
         获取指定的卡面id
         `mode`: 可选`["attribute", "characterId", "bandId", "rarity", "type"]`
@@ -473,110 +700,370 @@ class Card(object):
             raise ValueError("Undefined parameters.")
         
         card_ids = []
-        for key, value in self.id_data.items():
+        for key, value in self.__processed_data__.items():
             if str(value[mode]) in keywords:
-                card_ids.append(key)
+                card_ids.append(int(key))
         return card_ids
 
-    def get_thumb_card(self, id: str):
-        '''
-        获取卡面头像
-        `card_id`: 卡面id
-        '''
-        card_thumbs = []
-        resourceSetName = self.id_data[id]["resourceSetName"]
-        normal_path = os.path.abspath(f'./data/card/cards_thumb/{resourceSetName}_normal.png')
-        after_training_path = os.path.abspath(f'./data/card/cards_thumb/{resourceSetName}_after_training.png')
-        if self.id_data[id]["stat"].get("training"):
-            card_thumbs.append((Image.open(after_training_path).convert("RGBA"), True))
-            if self.id_data[id]["stat"]["training"]["levelLimit"] != 0:
-                card_thumbs.append((Image.open(normal_path).convert("RGBA"), False))
-        else:
-            card_thumbs.append((Image.open(normal_path).convert("RGBA"), False))
-        return card_thumbs
-    
-    def extra_get_thumb_card(self, id: str, illust: str, trainingStatus: str):
-        resourceSetName = self.id_data[id]["resourceSetName"]
-        normal_path = os.path.abspath(f'./data/card/cards_thumb/{resourceSetName}_normal.png')
-        after_training_path = os.path.abspath(f'./data/card/cards_thumb/{resourceSetName}_after_training.png')
-        if illust == "after_training":
-            im = Image.open(after_training_path).convert("RGBA")
-        else:
-            im = Image.open(normal_path).convert("RGBA")
+    # 图片数据获取
 
-        rarity = self.id_data[id]["rarity"]
-        attribute = self.id_data[id]["attribute"]
-        frame = str(rarity) if rarity != 1 else f"{rarity}_{attribute}"
+    @check_initialized
+    async def get_res(self, card_id: int) -> dict:
+        '''
+        获取卡牌对应的立绘
         
+        return:
+        ```
+        {
+            "normal": PIL.Image.Image,
+            "trained": PIL.Image.Image
+        }
+        ```
+        '''
+        resourceSetName = await self.get_resource_set_name(card_id)
+        normal_path = os.path.abspath(f'./data/card/cards/{resourceSetName[:6]}/{resourceSetName}_card_normal.png')
+        training_path = os.path.abspath(f'./data/card/cards/{resourceSetName[:6]}/{resourceSetName}_card_after_training.png')
+
+        res_info, server = await self._get_res_info(card_id)
+        normal, trained = res_info["normal"], res_info["trained"]
+        result = {}
+        if normal:
+            result["normal"] = Image.open(normal_path).convert("RGBA")
+        if trained:
+            result["trained"] = Image.open(training_path).convert("RGBA")
+
+        return result
+    
+    @check_initialized
+    async def get_thumb_res(self, card_id: int) -> dict:
+        '''
+        获取卡牌对应的缩略图
+        
+        return:
+        ```
+        {
+            "normal": PIL.Image.Image,
+            "trained": PIL.Image.Image
+        }
+        ```
+        '''
+        resourceSetName = await self.get_resource_set_name(card_id)
+        normal_path = os.path.abspath(f'./data/card/cards_thumb/{resourceSetName}_normal.png')
+        training_path = os.path.abspath(f'./data/card/cards_thumb/{resourceSetName}_after_training.png')
+
+        res_info, server = await self._get_res_info(card_id)
+        normal, trained = res_info["normal"], res_info["trained"]
+        result = {}
+        if normal:
+            result["normal"] = Image.open(normal_path).convert("RGBA")
+        if trained:
+            result["trained"] = Image.open(training_path).convert("RGBA")
+
+        return result
+    
+    @check_initialized
+    async def get_band_icon(self, card_id: int) -> Image.Image:
+        '''
+        获取卡牌对应的乐队图标
+        '''
+        band_id = await self.get_band_id(card_id)
+        return Image.open(os.path.abspath(f'./data/card/res/band_{band_id}.png')).convert("RGBA")
+    
+
+class _Skill:
+    '''
+    技能信息获取
+    '''
+    def __init__(self):
+        self.initialized = False
+
+    async def initialize(self):
+        logger.info("DATA.SKILL: 正在初始化")
+
+        await self._get_data()
+
+        self._scheduler = BackgroundScheduler()
+        self._scheduler.add_job(self._get_data, 'interval', hours=1)
+        self._scheduler.start()
+
+        logger.success("DATA.SKILL: 成功初始化")
+        self.initialized = True
+
+    async def _get_data(self):
+        if not USE_CACHE:
+            url = "https://bestdori.com/api/skills/all.10.json"
+            self.__data__: dict = json.loads(requests.get(url).text)
+        else:
+            with open(os.path.abspath("./cache/all.10.json"), 'r', encoding="UTF-8") as f: self.__data__: dict = json.load(f)
+        logger.success("DATA.SKILL: 成功获取技能数据")
+    
+    @check_initialized
+    async def get_skill_data(self, skill_id: str) -> dict:
+        '''
+        获取技能数据
+        '''
+        return self.__data__[skill_id]
+    
+    @check_initialized
+    async def get_skill_description(self, skill_id :str) -> str:
+        '''
+        获取技能描述
+        '''
+        skill_data = await self.get_skill_data(skill_id)
+        description: str = skill_data["description"][CN] if skill_data["description"][CN] else skill_data["description"][JP]
+        duration: str = "/".join([str(i) for i in skill_data["duration"]])
+        if skill_data.get("onceEffect"):
+            onceEffectValue: str = str(skill_data["onceEffect"]["onceEffectValue"][CN]) if skill_data["onceEffect"]["onceEffectValue"][CN] else str(skill_data["onceEffect"]["onceEffectValue"][JP])
+            return description.format(onceEffectValue, duration)
+        else:
+            return description.format(duration)
+
+
+class _AreaItem:
+    '''
+    加成信息获取
+    '''
+    def __init__(self):
+        self.initialized = False
+
+    async def initialize(self):
+        logger.info("DATA.AREAITEM: 正在初始化")
+
+        await self._get_data()
+
+        self._scheduler = BackgroundScheduler()
+        self._scheduler.add_job(self._get_data, 'interval', hours=1)
+        self._scheduler.start()
+
+        logger.success("DATA.AREAITEM: 成功初始化")
+        self.initialized = True
+
+    async def _get_data(self):
+        if not USE_CACHE:
+            url = "https://bestdori.com/api/areaItems/main.5.json"
+            self.__data__: dict = json.loads(requests.get(url).text)
+        else:
+            with open(os.path.abspath("./cache/main.5.json"), 'r', encoding="UTF-8") as f: self.__data__: dict = json.load(f)
+        
+        for k, data in self.__data__.items():
+            for idx, band_id in enumerate(data["targetBandIds"]):
+                if 18 == band_id:
+                    self.__data__[k]["targetBandIds"][idx] = 7
+                if 21 == band_id:
+                    self.__data__[k]["targetBandIds"][idx] = 6
+        
+        logger.success("DATA.AREAITEM: 成功获取加成数据")
+
+    @check_initialized
+    async def get_data(self, area_item_category: str) -> dict:
+        return self.__data__[area_item_category]
+    
+    @check_initialized
+    async def get_performance_data(self, area_item_category: str, level: str) -> int:
+        return (await self.get_data(area_item_category))["performance"][level][0]
+
+    @check_initialized
+    async def get_technique_data(self, area_item_category: str, level: str) -> int:
+        return (await self.get_data(area_item_category))["technique"][level][0]
+    
+    @check_initialized
+    async def get_visual_data(self, area_item_category: str, level: str) -> int:
+        return (await self.get_data(area_item_category))["visual"][level][0]
+    
+    @check_initialized
+    async def get_addition_data(self, area_item_category: str, level: str) -> dict:
+        return {
+            "performance": (await self.get_performance_data(area_item_category, level)) / 100,
+            "technique": (await self.get_technique_data(area_item_category, level)) / 100,
+            "visual": (await self.get_visual_data(area_item_category, level)) / 100
+        }
+
+    @check_initialized
+    async def get_target_attributes(self, area_item_category: str) -> list:
+        return (await self.get_data(area_item_category))["targetAttributes"]
+    
+    @check_initialized
+    async def get_target_band_ids(self, area_item_category: str) -> list:
+        return (await self.get_data(area_item_category))["targetBandIds"]
+
+
+class Data(object):
+    '''
+    数据获取类
+    '''
+    def __init__(self):
+        self.initialized = False
+    
+    async def initialize(self):
+        self.card = _Card()
+        self.skill = _Skill()
+        self.areaitem = _AreaItem()
+        await self.card.initialize()
+        await self.skill.initialize()
+        await self.areaitem.initialize()
+
+    async def _get_areaitem_matched_card_num(self, card_ids: list, areaitem_dict: dict):
+        result = {(await self.card.get_attribute(card_id), await self.card.get_band_id(card_id)): {"performance": 0, "technique": 0, "visual": 0} for card_id in card_ids}
+        situation = set()
+        for areaitem_id, areaitem_level in areaitem_dict.items():
+            attributes_condition = await self.areaitem.get_target_attributes(areaitem_id)
+            band_ids_condition = await self.areaitem.get_target_band_ids(areaitem_id)
+            for card_id in card_ids:
+                attribute = await self.card.get_attribute(card_id)
+                band_id = await self.card.get_band_id(card_id)
+                situation.add((attribute, band_id))
+
+        for attribute, band_id in situation:
+            for areaitem_id, areaitem_level in areaitem_dict.items():
+                attributes_condition = await self.areaitem.get_target_attributes(areaitem_id)
+                band_ids_condition = await self.areaitem.get_target_band_ids(areaitem_id)
+                if attribute in attributes_condition and band_id in band_ids_condition:
+                    addition_data = await self.areaitem.get_addition_data(areaitem_id, areaitem_level)
+                    result[(attribute, band_id)]["performance"] += addition_data["performance"]
+                    result[(attribute, band_id)]["technique"] += addition_data["technique"]
+                    result[(attribute, band_id)]["visual"] += addition_data["visual"]
+        return result
+
+    async def calculate_final_stat(self, card_stats: dict, areaitem_dict: dict) -> dict:
+        '''
+        计算乐队总综合力
+
+        param:
+        ```
+        card_stats = {
+            card_id: {
+                "performance": ...
+            }
+        }
+
+        areaitem_dict = {
+            areaitem_id: areaitem_level
+        }
+        ```
+        '''
+        situations = set()
+        stats = {(await self.card.get_attribute(card_id), await self.card.get_band_id(card_id)): {"performance": 0, "technique": 0, "visual": 0} for card_id in card_stats.keys()}
+        
+        for card_id in card_stats.keys():
+            attribute = await self.card.get_attribute(card_id)
+            band_id = await self.card.get_band_id(card_id)
+            situations.add((attribute, band_id))
+
+        for card_id, card_stat in card_stats.items():
+            for attribute, band_id in situations:
+                _attribute = await self.card.get_attribute(card_id)
+                _band_id = await self.card.get_band_id(card_id)
+                if _attribute == attribute and _band_id == band_id:
+                    stats[(attribute, band_id)]["performance"] += card_stat["performance"]
+                    stats[(attribute, band_id)]["technique"] += card_stat["technique"]
+                    stats[(attribute, band_id)]["visual"] += card_stat["visual"]
+            
+        addition_data = await self._get_areaitem_matched_card_num(card_stats.keys(), areaitem_dict)
+        stat_additions = {(await self.card.get_attribute(card_id), await self.card.get_band_id(card_id)): {"performance": 0, "technique": 0, "visual": 0} for card_id in card_stats.keys()}
+        for situation, stat in stats.items():
+            for stat_type in stat.keys():
+                stat_additions[situation][stat_type] = stat[stat_type] * addition_data[situation][stat_type]
+
+        for situation, stat in stats.items():
+            for stat_type in stat.keys():
+                stats[situation][stat_type] += stat_additions[situation][stat_type]
+            stats[situation]["total"] = sum([stat for stat_type, stat in stats[situation].items() if stat_type != "total"])
+        stats["total"] = sum([stat["total"] for stat in stats.values()])
+        return stats
+
+data = Data()
+
+
+class Card(object):
+    def __init__(self):
+        pass
+
+    async def timestamp_to_datetime(self, timestamp: int) -> str:
+        if timestamp:
+            timestamp = int(timestamp) / 1000  # 转换为秒级时间戳
+            dt = datetime.datetime.fromtimestamp(timestamp)
+            chinese_datetime = dt.strftime("%Y年%#m月%#d日, %I:%M %p")
+            return chinese_datetime
+    
+    async def extra_get_thumb_card(self, id: int, illust: str, trainingStatus: str):
+        im: Image.Image = (await data.card.get_thumb_res(id))["trained" if illust == "after_training" else "normal"]
+
+        rarity = await data.card.get_rarity(id)
+        attribute = await data.card.get_attribute(id)
+        frame = str(rarity) if rarity != 1 else f"{rarity}_{attribute}"
+        band_icon = (await data.card.get_band_icon(id)).resize((48, 48), Image.Resampling.BILINEAR)
+        
+        im.paste(data.card.frame_img[frame], box=(0, 0), mask=data.card.frame_img[frame].split()[3])
         if trainingStatus == "done":
             for i in range(0, rarity):
-                im.paste(self.star_thumb_img, box=(8, 180 - (i+1)* 24 - 8), mask=self.star_thumb_img.split()[3])
+                im.paste(data.card.star_thumb_img, box=(4, 180 - (i+1) * 24 - 8), mask=data.card.star_thumb_img.split()[3])
         else:
             for i in range(0, rarity):
-                im.paste(self.star_normal_thumb_img, box=(8, 180 - (i+1)* 24 - 8), mask=self.star_normal_thumb_img.split()[3])
-        im.paste(self.frame_img[frame], box=(0, 0), mask=self.frame_img[frame].split()[3])
-        im.paste(self.attribute_thumb_img[attribute], box=(133, 3), mask=self.attribute_thumb_img[attribute].split()[3])
+                im.paste(data.card.star_normal_thumb_img, box=(4, 180 - (i+1)* 24 - 8), mask=data.card.star_normal_thumb_img.split()[3])
+        im.paste(data.card.attribute_thumb_img[attribute], box=(133, 3), mask=data.card.attribute_thumb_img[attribute].split()[3])
+        im = ImageUtils.paste(im, band_icon, (2, 2))
         return im
         
-    def make_thumb_card(self, card_id: str, thumb_card: Image.Image, trained: bool) -> Image:
+    async def make_thumb_card(self, card_id: int, thumb_card: Image.Image, trained: bool) -> Image:
         '''
         生成卡面头像
         `card_id`: 卡面id
         `thumb_card`: 缩略图
         `trained`: 是否训练
         '''        
-        rarity = self.id_data[card_id]["rarity"]
-        attribute = self.id_data[card_id]["attribute"]
+        rarity = await data.card.get_rarity(card_id)
+        attribute = await data.card.get_attribute(card_id)
         frame = str(rarity) if rarity != 1 else f"{rarity}_{attribute}"
+        band_icon = (await data.card.get_band_icon(card_id)).resize((48, 48), Image.Resampling.BILINEAR)
         
+        thumb_card.paste(data.card.frame_img[frame], box=(0, 0), mask=data.card.frame_img[frame].split()[3])
         if trained:
             for i in range(0, rarity):
-                thumb_card.paste(self.star_thumb_img, box=(8, 180 - (i+1)* 24 - 8), mask=self.star_thumb_img.split()[3])
+                thumb_card.paste(data.card.star_thumb_img, box=(4, 180 - (i+1)* 24 - 8), mask=data.card.star_thumb_img.split()[3])
         else:
             for i in range(0, rarity):
-                thumb_card.paste(self.star_normal_thumb_img, box=(8, 180 - (i+1)* 24 - 8), mask=self.star_normal_thumb_img.split()[3])
-        thumb_card.paste(self.frame_img[frame], box=(0, 0), mask=self.frame_img[frame].split()[3])
-        thumb_card.paste(self.attribute_thumb_img[attribute], box=(133, 3), mask=self.attribute_thumb_img[attribute].split()[3])
+                thumb_card.paste(data.card.star_normal_thumb_img, box=(4, 180 - (i+1)* 24 - 8), mask=data.card.star_normal_thumb_img.split()[3])
+        thumb_card.paste(data.card.attribute_thumb_img[attribute], box=(133, 3), mask=data.card.attribute_thumb_img[attribute].split()[3])
+        thumb_card = ImageUtils.paste(thumb_card, band_icon, (2, 2))
 
         return thumb_card
 
-    def init_thumb(self, card_id: str) -> Image:
+    async def init_thumb(self, card_id: int) -> Image:
         '''
         生成卡面双图
         `card_id`: 卡面id
         '''
-        font = ImageFont.truetype(font=self.FONT_PATH, size = 28)
+        font = get_font("ksm", 28)
 
         def to_width(string: str) -> int:
             return math.ceil(font.getlength(string))
         
-        card_name_cn = self.id_data[card_id]["prefix"][3]
-        if not card_name_cn:
-            card_name_cn = self.id_data[card_id]["prefix"][0]
+        prefixes = await data.card.get_prefix(card_id)
+        prefix = prefixes[CN] or prefixes[JP]
 
-        thumbs = self.get_thumb_card(card_id)
+        thumbs = await data.card.get_thumb_res(card_id)
         thumbnails = []
-        for thumb,i in thumbs:
-            thumbnails.append(self.make_thumb_card(card_id, thumb, i))
+        for k, v in thumbs.items():
+            thumbnails.append(await self.make_thumb_card(card_id, v, k=="trained"))
             
-        img = Image.new("RGBA", (self.thumb_bg.getbbox()[2], self.thumb_bg.getbbox()[3]))
-        img.paste(self.thumb_bg, (0,0), self.thumb_bg.split()[3])
+        img = Image.new("RGBA", (data.card.thumb_bg.getbbox()[2], data.card.thumb_bg.getbbox()[3]))
+        img.paste(data.card.thumb_bg, (0,0), data.card.thumb_bg.split()[3])
 
         if len(thumbnails) == 1:
-            img.paste(thumbnails[0], ((img.getbbox()[2] - thumbnails[0].getbbox()[2])//2, (self.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[0].split()[3])
+            img.paste(thumbnails[0], ((img.getbbox()[2] - thumbnails[0].getbbox()[2])//2, (data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[0].split()[3])
         else:
-            img.paste(thumbnails[1], ((self.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3, (self.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[1].split()[3])
-            img.paste(thumbnails[0], ((self.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3 * 2 + thumbnails[0].getbbox()[2], (self.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[0].split()[3])
+            img.paste(thumbnails[1], ((data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3, (data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[1].split()[3])
+            img.paste(thumbnails[0], ((data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3 * 2 + thumbnails[0].getbbox()[2], (data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[0].split()[3])
 
         draw = ImageDraw.Draw(img)
-        x, y = (img.getbbox()[2] - to_width(card_name_cn))//2, self.thumb_bg.getbbox()[3] - (self.thumb_bg.getbbox()[3] - (self.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3 - thumbnails[0].getbbox()[3])//2 - 28
-        draw.text((x, y - 14), card_name_cn, font=font, fill=(0,0,0))
+        x, y = (img.getbbox()[2] - to_width(prefix))//2, data.card.thumb_bg.getbbox()[3] - (data.card.thumb_bg.getbbox()[3] - (data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3 - thumbnails[0].getbbox()[3])//2 - 28
+        draw.text((x, y - 14), prefix, font=font, fill=(0,0,0))
         
-        draw.text(((img.getbbox()[2] - to_width(f'{card_id} | {self.meta_id_data[card_id]["type"]}'))//2, y + 22), f'{card_id} | {self.meta_id_data[card_id]["type"]}', font=ImageFont.truetype(font=self.FONT_PATH, size = 28), fill=(0,0,0))
+        draw.text(((img.getbbox()[2] - to_width(f'{card_id} | {await data.card.get_type(card_id)}'))//2, y + 22), f'{card_id} | {await data.card.get_type(card_id)}', font=font, fill=(0,0,0))
         
         return img
 
-    def make_thumb_cards_table(self, thumb_cards: list):
+    async def make_thumb_cards_table(self, thumb_cards: list):
         '''
         生成卡面头像预览列表
         `thumb_cards`: 列表嵌套列表装`Image`
@@ -588,9 +1075,9 @@ class Card(object):
 
         bg_p = Image.open(os.path.abspath("data/bg/bg_pattern.png"))
 
-        W, H  = self.thumb_bg.getbbox()[2], self.thumb_bg.getbbox()[3]
+        W, H  = data.card.thumb_bg.getbbox()[2], data.card.thumb_bg.getbbox()[3]
 
-        ###生成背景
+        # 生成背景
         width = 36*2 + len(thumb_cards) * W + (len(thumb_cards) - 1) * 48
         height = 36*2 + max_lenth * H + (max_lenth - 1) * 32
         (width_p, height_p) = bg_p.size     #用来拼合的图片的长宽
@@ -610,7 +1097,7 @@ class Card(object):
                 im.paste(j, box=(36 + idx_i * W + (idx_i) * 48, 36 + idx_j * H + (idx_j) * 32), mask = j.split()[3])
         return im
     
-    def get_cards(self, characterId: int = None, bandId: int = None, attribute: str = None, rarity: int = None, type: str = None):
+    async def get_cards(self, characterId: int = None, bandId: int = None, attribute: str = None, rarity: int = None, type: str = None):
         '''
         获取符合要求的角色卡面
         `characterId`: 角色ID
@@ -619,22 +1106,22 @@ class Card(object):
         `rarity`: 稀有度
         `type`: 类型
         '''
-        data, cards = {}, {}
+        _data, cards = {}, {}
 
         if characterId:
-            data["characterId"] = characterId
+            _data["characterId"] = characterId
         if bandId:
-            data["bandId"] = bandId
+            _data["bandId"] = bandId
 
         if attribute:
-            data["attribute"] = attribute
+            _data["attribute"] = attribute
         if rarity:
-            data["rarity"] = rarity
+            _data["rarity"] = rarity
         if type:
-            data["type"] = type
+            _data["type"] = type
 
-        for key, value in data.items():
-            cards[key] = set(self.get_card_id(key, value))
+        for key, value in _data.items():
+            cards[key] = set(await data.card.get_card_id(key, value))
 
         merged_cards = []
         if len(cards) == 1:
@@ -643,92 +1130,65 @@ class Card(object):
             merged_cards = list(set.intersection(*cards.values()))
 
         if len(merged_cards) == 1:
-            return self.get_card(merged_cards[0])
+            return await self.get_card(merged_cards[0])
         elif len(merged_cards) == 0:
             return
 
-        sorted_cards = self.sort_cards(merged_cards)
-        return self.make_thumb_cards_table(sorted_cards)
+        sorted_cards = await self.sort_cards(merged_cards)
+        return await self.make_thumb_cards_table(sorted_cards)
 
-    def make_title(self, data: dict) -> Image.Image:
-        band_id: str = str((data["characterId"] - 1) // 5 + 1)
-        prefix: str = data["prefix"][CN] if data["prefix"][CN] else data["prefix"][JP]
-        prefix_width = math.ceil(ImageFont.truetype(font=self.FONT_PATH_BANDORI, size = 36).getlength(prefix))
-        character_name: str = self.characterId2name[str(data['characterId'])][0]
-        character_name_width = math.ceil(ImageFont.truetype(font=self.FONT_PATH_BANDORI, size = 45).getlength(character_name))
+    async def make_title(self, _data: dict) -> Image.Image:
+        band_id: str = str((_data["characterId"] - 1) // 5 + 1)
+        prefix: str = _data["prefix"][CN] or _data["prefix"][JP]
+        prefix_width = math.ceil(get_font("grpcn", 36).getlength(prefix))
+        character_name: str = data.card.characterId2name[str(_data['characterId'])][0]
+        character_name_width = math.ceil(get_font("grpcn", 45).getlength(character_name))
         result: Image.Image = Image.open(os.path.abspath('./data/card/res/title.png')).convert("RGBA")
-        result.paste(self.band_img[band_id], (72, 32), self.band_img[band_id].split()[3])
+        result.paste(data.card.band_img[band_id], (72, 32), data.card.band_img[band_id].split()[3])
         draw = ImageDraw.Draw(result)
-        draw.text(((result.width - prefix_width)//2, 21), prefix, (84,84,84), ImageFont.truetype(font=self.FONT_PATH_BANDORI, size = 36))
-        draw.text(((result.width - character_name_width)//2, 72), character_name, (80,80,80), ImageFont.truetype(font=self.FONT_PATH_BANDORI, size = 45))
+        draw.text(((result.width - prefix_width)//2, 21), prefix, (84,84,84), get_font("grpcn", 36))
+        draw.text(((result.width - character_name_width)//2, 72), character_name, (80,80,80), get_font("grpcn", 45))
         return result
     
-    def make_illustration(self, data: dict) -> Image.Image:
-        resourceSetName: str = data["resourceSetName"]
-        rarity: int = data["rarity"]
-        attribute: str = data["attribute"]
-        frame: Image.Image = self.frame_large_img[str(rarity) if rarity != 1 else f"{rarity}_{attribute}"].resize((860, 576), Image.Resampling.BILINEAR).convert("RGBA")
-        attribute: Image.Image = self.attribute_img[data["attribute"]].resize((83, 83), Image.Resampling.BILINEAR)
-        illusts, isTrained = [], []
-
-        normal_path = os.path.abspath(f'./data/card/cards/{resourceSetName[:6]}/{resourceSetName}_card_normal.png')
-        training_path = os.path.abspath(f'./data/card/cards/{resourceSetName[:6]}/{resourceSetName}_card_after_training.png')
-        try:
-            if not data["stat"].get("training"):
-                illusts.append(Image.open(normal_path).resize((840, 630), Image.Resampling.BILINEAR).convert("RGBA").crop((0, 35, 840, 595)))
-                isTrained.append(False)
-            else:
-                if data["stat"]["training"]["levelLimit"] != 0:
-                    illusts.append(Image.open(normal_path).resize((840, 630), Image.Resampling.BILINEAR).convert("RGBA").crop((0, 35, 840, 595)))
-                    isTrained.append(False)
-                illusts.append(Image.open(training_path).resize((840, 630), Image.Resampling.BILINEAR).convert("RGBA").crop((0, 35, 840, 595)))
-                isTrained.append(True)
-        except FileNotFoundError:
-            illusts = [Image.open(training_path).resize((840, 630), Image.Resampling.BILINEAR).convert("RGBA").crop((0, 35, 840, 595))]
-            isTrained = [True]
+    async def make_illustration(self, _data: dict, card_id: int) -> Image.Image:
+        rarity: int = _data["rarity"]
+        attribute: str = _data["attribute"]
+        frame: Image.Image = data.card.frame_large_img[str(rarity) if rarity != 1 else f"{rarity}_{attribute}"].resize((860, 576), Image.Resampling.BILINEAR).convert("RGBA")
+        attribute: Image.Image = data.card.attribute_img[_data["attribute"]].resize((83, 83), Image.Resampling.BILINEAR)
+        illusts = await data.card.get_res(card_id)
 
         result = Image.new("RGBA", (1006, 560 * len(illusts) + 48 * (len(illusts) - 1) + 32), (255,255,255))
-        for i, illust in enumerate(illusts):
+        for i, k in enumerate(illusts):
+            type, illust = k, illusts[k].resize((840, 630), Image.Resampling.BICUBIC).crop((0, 35, 840, 595))
             result.paste(illust, (81, 24 + (illust.height + 48) * i), illust.split()[3])
             result = ImageUtils.paste(result, frame, (81 - 6, 24 + (illust.height + 48) * i - 6))
             result = ImageUtils.paste(result, attribute, (illust.width - 4, 31 + (illust.height + 48) * i))
-            star = self.star_img.resize((60, 60), Image.Resampling.BILINEAR) if isTrained[i] else self.star_normal_img.resize((60, 60), Image.Resampling.BILINEAR)
+            star = data.card.star_img.resize((60, 60), Image.Resampling.BILINEAR) if type == "trained" else data.card.star_normal_img.resize((60, 60), Image.Resampling.BILINEAR)
             for j in range(0, rarity):
                 result = ImageUtils.paste(result, star, (84, illust.height - 60 * j - 38 + (illust.height + 48) * i))
         return result
 
-    def make_power(self, data: dict):
-        level = max([i if i.isdigit() else "0" for i in data["stat"]])
-        power = {
-            "performance": data["stat"][level]["performance"],
-            "technique": data["stat"][level]["technique"], 
-            "visual": data["stat"][level]["visual"]
-        }
-        for i in ["performance", "technique", "visual"]:
-            power[i] += data["stat"].get("training", {}).get(i, 0)
-        for i in range(0, 2):
-            for j in ["performance", "technique", "visual"]:
-                power[j] += data["stat"].get("episodes", [{},{}])[i].get(j, 0)
-        power["all"] = power['performance'] + power['technique'] + power['visual']  
+    async def make_power(self, card_id: int):
+        power = await data.card.get_max_stat(card_id)
 
         result: Image.Image = Image.open(os.path.abspath(f'./data/card/res/power.png')).convert("RGBA")
         draw = ImageDraw.Draw(result)
-        draw.text((724, 11), str(power['all']), (80,80,80), ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 45))
-        draw.text((59, 146), str(power['performance']), (85,85,85), ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 30))
-        draw.text((375, 146), str(power['technique']), (85,85,85), ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 30))
-        draw.text((703, 146), str(power['visual']), (85,85,85), ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 30))
+        draw.text((724, 11), str(power['total']), (80,80,80), get_font("grpjp", 45))
+        draw.text((59, 146), str(power['performance']), (85,85,85), get_font("grpjp", 30))
+        draw.text((375, 146), str(power['technique']), (85,85,85), get_font("grpjp", 30))
+        draw.text((703, 146), str(power['visual']), (85,85,85), get_font("grpjp", 30))
         return result
 
-    def make_character_level(self, data: dict):
-        level = max([i if i.isdigit() else "0" for i in data["stat"]])
+    async def make_character_level(self, card_id: int):
+        level = await data.card.get_level_limit(card_id)
         result: Image.Image = Image.open(os.path.abspath(f'./data/card/res/player_level.png')).convert("RGBA")
         draw = ImageDraw.Draw(result)
-        draw.text((92, 75), level, (95,95,95), ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 36))
-        draw.text((184, 83), level, (95,95,95), ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 28))
+        draw.text((92, 75), str(level), (95,95,95), get_font("grpjp", 36))
+        draw.text((184, 83), str(level), (95,95,95), get_font("grpjp", 28))
         return result
     
-    def make_released_time(self, data: dict) -> Image.Image:
-        released_text = "\n".join([self.timestamp_to_datetime(i) + [" (JP)", " (EN)", " (TW)", " (CN)", " (KR)"][idx] for idx, i in enumerate(data["releasedAt"]) if i and idx in [0, 3]])
+    async def make_released_time(self, _data: dict) -> Image.Image:
+        released_text = "\n".join([await self.timestamp_to_datetime(i) + [" (JP)", " (EN)", " (TW)", " (CN)", " (KR)"][idx] for idx, i in enumerate(_data["releasedAt"]) if i and idx in [0, 3]])
         return ImageUtils.paste(Image.open(os.path.abspath(f'./data/card/res/released_time.png')).crop((0, 0, 1006, 72 + 40 * (released_text.count("\n") + 1))).convert("RGBA"),
                                 ImageUtils.text2img(released_text,
                                     {
@@ -737,56 +1197,53 @@ class Card(object):
                                         "y_padding": 0,
                                         "fill": (81, 81, 81),
                                         "bg_fill": (0, 0, 0, 0),
-                                        "font": ImageFont.truetype(font=self.FONT_PATH_BANDORI, size = 30)  
+                                        "font": get_font("grpcn", 30)
                                     }),
                                     (45, 69)
                                 )
     
-    def make_skill_level(self):
+    async def make_skill_level(self):
         result: Image.Image = Image.open(os.path.abspath(f'./data/card/res/skill_level.png')).convert("RGBA")
         draw = ImageDraw.Draw(result)
-        draw.text((92, 75), "5", (95,95,95), ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 36))
-        draw.text((154, 83), "5", (95,95,95), ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 28))
+        draw.text((92, 75), "5", (95,95,95), get_font("grpjp", 36))
+        draw.text((154, 83), "5", (95,95,95), get_font("grpjp", 28))
         return result
 
-    def make_skill(self, data: dict):
+    async def make_skill(self, card_id: int):
         return ImageUtils.paste(Image.open(os.path.abspath(f'./data/card/res/skill_description.png')).convert("RGBA"), 
                                 ImageUtils.text2img(
-                                    self.get_skill(str(data["skillId"])), 
+                                    await data.skill.get_skill_description(str(await data.card.get_skill_id(card_id))), 
                                     {
                                     "width": 1006,
                                     "x_padding": 73,
                                     "y_padding": 27,
                                     "fill": (81, 81, 81),
                                     "bg_fill": (0, 0, 0, 0),
-                                    "font": ImageFont.truetype(font=self.FONT_PATH_BANDORI, size = 32)
+                                    "font": get_font("grpcn", 32)
                                 }), 
                                 (0, 0)
                             ) 
 
-    def get_card(self, id: str) -> Image.Image:
-        if self.meta_id_data.get(id):
-            data: dict = self.meta_id_data[id]
-        else:
-            return
+    async def get_card(self, id: int) -> Image.Image:
+        _data: dict = await data.card.get_data(id)
         
         imgs = []
-        imgs.append(self.make_title(data))
-        imgs.append(self.make_illustration(data))
-        imgs.append(self.make_power(data))
-        imgs.append(self.make_released_time(data))
-        imgs.append(self.make_character_level(data))
-        imgs.append(self.make_skill_level())
-        imgs.append(self.make_skill(data))
+        imgs.append(await self.make_title(_data))
+        imgs.append(await self.make_illustration(_data, id))
+        imgs.append(await self.make_power(id))
+        imgs.append(await self.make_released_time(_data))
+        imgs.append(await self.make_character_level(id))
+        imgs.append(await self.make_skill_level())
+        imgs.append(await self.make_skill(id))
 
         result = ImageUtils.merge_images(imgs, "v", 16, 0, 32, (255, 255, 255, 255))
         draw = ImageDraw.Draw(result)
 
-        ImageUtils.border_text(draw, (4, result.height - 28), "ID: " + id, ImageFont.truetype(font=self.FONT_PATH_BANDORI_JP, size = 24), (0,0,0), (255,255,255))
+        ImageUtils.border_text(draw, (4, result.height - 28), "ID: " + id, get_font("grpjp", 24), (0,0,0), (255,255,255))
 
         return result
     
-    def adjust_list(self, obj):
+    async def adjust_list(self, obj):
         """
         将对象调整为长宽比接近1的嵌套列表对象。
         如果对象只有一行或一列，将其转换为行列数尽可能接近的二维列表。
@@ -813,23 +1270,24 @@ class Card(object):
         
         return new_obj
 
-    def sort_cards(self, card_ids: list) -> list:
+    async def sort_cards(self, card_ids: list) -> list:
         attribute_order = ["cool", "happy", "powerful", "pure"]
         result = []
         
         character_ids = []
         for i in card_ids:
-            if self.id_data[i]["characterId"] not in character_ids:
-                character_ids.append(self.id_data[i]["characterId"])
+            character_id = await data.card.get_character_id(i)
+            if character_id not in character_ids:
+                character_ids.append(character_id)
         character_ids.sort()
         
         if len(character_ids) == 1:
             # 单人按属性排
             for attribute in attribute_order:
-                filtered_list = [card_id for card_id in card_ids if self.id_data[card_id]["attribute"] == attribute]
-                sorted_list = sorted(filtered_list, key=lambda x: self.id_data[x]["rarity"], reverse=True)
+                filtered_list = [card_id for card_id in card_ids if await data.card.get_attribute(card_id) == attribute]
+                sorted_list = await self.sort_filtered_list(filtered_list)
                 for idx, v in enumerate(sorted_list):
-                    sorted_list[idx] = self.init_thumb(card_id=str(v))
+                    sorted_list[idx] = await self.init_thumb(card_id=v)
                 if sorted_list:
                     result.append(sorted_list)
         elif len(character_ids) > 5:
@@ -843,32 +1301,43 @@ class Card(object):
                 
                 current_list = []
                 for card_id in card_ids:
-                    char_id = self.id_data[card_id]["characterId"]
+                    char_id = await data.card.get_character_id(card_id)
                     if char_id in character_ids[start_index:end_index]:
                         current_list.append(card_id)
                 
                 if current_list:
-                    sorted_list = sorted(current_list, key=lambda x: (self.id_data[x]["rarity"]), reverse=True)
+                    sorted_list = await self.sort_filtered_list(current_list)
                     for idx, v in enumerate(sorted_list):
-                        sorted_list[idx] = self.init_thumb(card_id=str(v))
+                        sorted_list[idx] = await self.init_thumb(card_id=v)
                     result.append(sorted_list)
         else:
             # 2-5人按角色和属性排
             for attribute in attribute_order:
                 for i in range(1, 36):
-                    filtered_list = [card_id for card_id in card_ids if self.id_data[card_id]["characterId"] == i and self.id_data[card_id]["attribute"] == attribute]
-                    sorted_list = sorted(filtered_list, key=lambda x: self.id_data[x]["rarity"], reverse=True)
+                    filtered_list = [card_id for card_id in card_ids if await data.card.get_character_id(card_id) == i and await data.card.get_attribute(card_id) == attribute]
+                    sorted_list = await self.sort_filtered_list(filtered_list)
                     for idx,v in enumerate(sorted_list):
-                        sorted_list[idx] = self.init_thumb(card_id=str(v))
+                        sorted_list[idx] = await self.init_thumb(card_id=v)
                     if sorted_list:
                         result.append(sorted_list)
-        return self.adjust_list(result)
+        return await self.adjust_list(result)
+        
+    async def sort_filtered_list(self, filtered_list):
+        async def get_rarity(x):
+            return await data.card.get_rarity(x)
 
-    def get(self, prompt: str) -> Image.Image:
+        tasks = [get_rarity(x) for x in filtered_list]
+        rarities = await asyncio.gather(*tasks)
+
+        sorted_list = [x for _, x in sorted(zip(rarities, filtered_list), reverse=True)]
+
+        return sorted_list
+
+    async def get(self, prompt: str) -> Image.Image:
         prompts = prompt[2:].strip().split()
 
         if len(prompts) == 1 and prompts[0].isdigit():
-            result = self.get_card(prompts[0])
+            result = await self.get_card(prompts[0])
         else:
             cfg = {
                 "attribute": [],
@@ -878,28 +1347,27 @@ class Card(object):
                 "characterId": []
             }
             for i in prompts:
-                if i in self.attribute_list:
-                    cfg["attribute"] += self.get_attribute_types(i)
-                elif i in self.band_list:
-                    cfg["bandId"] += self.get_band_ids(i)
-                elif i in self.rarity_list:
-                    cfg["rarity"] += self.get_rarities(i)
-                elif i in self.type_list:
-                    cfg["type"] += self.get_types(i)
+                if i in data.card.attribute_list:
+                    cfg["attribute"] += await data.card.get_attribute_types(i)
+                elif i in data.card.band_list:
+                    cfg["bandId"] += await data.card.get_band_ids(i)
+                elif i in data.card.rarity_list:
+                    cfg["rarity"] += await data.card.get_rarities(i)
+                elif i in data.card.type_list:
+                    cfg["type"] += await data.card.get_types(i)
                 else:
-                    cfg["characterId"] += self.get_character_ids(i)
-            result = self.get_cards(cfg.get("characterId"), cfg.get("bandId"), cfg.get("attribute"), cfg.get("rarity"), cfg.get("type"))
-        result.paste(self.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=self.watermark.split()[3])
+                    cfg["characterId"] += await data.card.get_character_ids(i)
+            result = await self.get_cards(cfg.get("characterId"), cfg.get("bandId"), cfg.get("attribute"), cfg.get("rarity"), cfg.get("type"))
+        result.paste(data.card.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=data.card.watermark.split()[3])
         return result
 
 card = Card()
 
 
-
 class PlayerState(object):
     def __init__(self) -> None:
         self.font_path = os.path.abspath("data/fonts/GB18030.ttf")
-        logging.info("STATE: 字体加载成功")
+        logger.info("STATE: 字体加载成功")
 
         self.servers = ["jp", "en", "tw", "cn", "kr"]
         self.servers_dict = {
@@ -925,14 +1393,14 @@ class PlayerState(object):
             "full_combo": Image.open(os.path.abspath(f'./data/bg/music_full_combo.png')).convert("RGBA"),
             "all_perfect": Image.open(os.path.abspath(f'./data/bg/music_all_perfect.png')).convert("RGBA")
         }
-        logging.info("STATE: 资源加载成功")
+        logger.info("STATE: 资源加载成功")
         
         self.get_data()
 
         self.scheduler = BackgroundScheduler()
         self.scheduler.add_job(self.get_data, 'interval', hours=1)
         self.scheduler.start()
-        logging.info("STATE: 添加定时任务成功，将每小时更新一次数据")
+        logger.info("STATE: 添加定时任务成功，将每小时更新一次数据")
 
     def get_data(self):
         '''
@@ -944,7 +1412,7 @@ class PlayerState(object):
                 self.data_degree: dict = json.load(f)
         else:
             self.data_degree: dict = json.loads(requests.get(url_degree).text)
-        logging.info("STATE: 数据获取成功")
+        logger.info("STATE: 数据获取成功")
 
         self.res_jp_degree, self.res_cn_degree = [], []
         for v in self.data_degree.values():
@@ -956,18 +1424,18 @@ class PlayerState(object):
         self.miss_cn_degrees = list(set(self.res_cn_degree).difference(set(self.get_file_name(os.path.abspath(f'./data/degrees/cn')))))
 
         if len(self.miss_jp_degrees) > 0 :
-            logging.warning(f"STATE: 称号资源(JP)未下载: {self.miss_jp_degrees}")
-            logging.info("STATE: 开始尝试下载称号资源(JP)")
+            logger.warning(f"STATE: 称号资源(JP)未下载: {self.miss_jp_degrees}")
+            logger.info("STATE: 开始尝试下载称号资源(JP)")
             download.download_degrees(self.miss_jp_degrees, "jp")
         else:
-            logging.info("STATE: 称号资源(JP)加载成功")
+            logger.info("STATE: 称号资源(JP)加载成功")
 
         if len(self.miss_cn_degrees) > 0 :
-            logging.warning(f"STATE: 称号资源(CN)未下载: {self.miss_cn_degrees}")
-            logging.info("STATE: 开始尝试下载称号资源(CN)")
+            logger.warning(f"STATE: 称号资源(CN)未下载: {self.miss_cn_degrees}")
+            logger.info("STATE: 开始尝试下载称号资源(CN)")
             download.download_degrees(self.miss_cn_degrees, "cn")
         else:
-            logging.info("STATE: 称号资源(CN)加载成功")
+            logger.info("STATE: 称号资源(CN)加载成功")
 
     def to_width(self, string: str, font: ImageFont.ImageFont) -> int:
         return math.ceil(font.getlength(string))
@@ -1015,55 +1483,55 @@ class PlayerState(object):
         baseImage = ImageUtils.paste(baseImage, iconImage, (0, 0))
         return baseImage
 
-    def make_info_img(self, data: dict, type: str) -> Image.Image:
+    async def make_info_img(self, _data: dict, type: str) -> Image.Image:
         '''
         绘制玩家简介
         '''
         im = Image.new("RGBA", (self.img_info.width, self.img_info.height))
         im.paste(self.img_info, (0,0), self.img_info.split()[3])
-        isTrained = data["data"]["profile"]["userProfileSituation"]["illust"] != "normal"
-        card_id = str(data["data"]["profile"]["userProfileSituation"]["situationId"])
-        thumb_imgs = card.get_thumb_card(card_id)
-        for i,j in thumb_imgs:
-            if j == isTrained:
-                thumb_card = i
-        thumb_card = card.make_thumb_card(card_id, thumb_card, isTrained).convert("RGBA").resize((110, 110), Image.Resampling.LANCZOS)
+        isTrained = _data["data"]["profile"]["userProfileSituation"]["illust"] != "normal"
+        card_id = _data["data"]["profile"]["userProfileSituation"]["situationId"]
+        thumb_imgs = await data.card.get_thumb_res(card_id)
+        for i, j in thumb_imgs.items():
+            if (i == "trained") == isTrained:
+                thumb_card = j
+        thumb_card = (await card.make_thumb_card(card_id, thumb_card, isTrained)).convert("RGBA").resize((110, 110), Image.Resampling.LANCZOS)
         im.paste(thumb_card, (39, 36), thumb_card.split()[3])
         font = ImageFont.truetype(font=self.font_path, size = 48)
         font_28 = ImageFont.truetype(font=self.font_path, size = 28)
         draw = ImageDraw.Draw(im)
         draw.text(((448 - self.to_width("等级", font_28))//2, 50), "等级", (81,81,81), font_28)
-        draw.text(((448 - self.to_width(str(data["data"]["profile"]["rank"]), font))//2, 63+8), str(data["data"]["profile"]["rank"]), (81,81,81), font)
-        draw.text((316, 56), data["data"]["profile"]["userName"], (81,81,81), font)
-        draw.text((260, 287), data["data"]["profile"]["introduction"], (81,81,81), font_28)
+        draw.text(((448 - self.to_width(str(_data["data"]["profile"]["rank"]), font))//2, 63+8), str(_data["data"]["profile"]["rank"]), (81,81,81), font)
+        draw.text((316, 56), _data["data"]["profile"]["userName"], (81,81,81), font)
+        draw.text((260, 287), _data["data"]["profile"]["introduction"], (81,81,81), font_28)
         degrees = []
-        degrees.append(self.make_degree(str(data["data"]["profile"]["userProfileDegreeMap"]["entries"]["first"]["degreeId"]), self.servers_dict[type]).resize((401, 87), Image.Resampling.LANCZOS))
-        if data["data"]["profile"]["userProfileDegreeMap"]["entries"].get("second"):
-            degrees.append(self.make_degree(str(data["data"]["profile"]["userProfileDegreeMap"]["entries"]["second"]["degreeId"]), self.servers_dict[type]).resize((401, 87), Image.Resampling.LANCZOS))
+        degrees.append(self.make_degree(str(_data["data"]["profile"]["userProfileDegreeMap"]["entries"]["first"]["degreeId"]), self.servers_dict[type]).resize((401, 87), Image.Resampling.LANCZOS))
+        if _data["data"]["profile"]["userProfileDegreeMap"]["entries"].get("second"):
+            degrees.append(self.make_degree(str(_data["data"]["profile"]["userProfileDegreeMap"]["entries"]["second"]["degreeId"]), self.servers_dict[type]).resize((401, 87), Image.Resampling.LANCZOS))
         for i,v in enumerate(degrees):
             im = ImageUtils.paste(im, v, (40 + i * 417, 164))
-        return im
+        return im.crop((0, 36, 1086, 347))
     
-    def make_simple_info_img(self, data: dict, type: str) -> Image.Image:
+    async def make_simple_info_img(self, _data: dict, type: str) -> Image.Image:
         '''
         用于在没有详细玩家信息时绘制简介
         '''
         im = Image.new("RGBA", (self.img_info.width, self.img_info.height))
         im.paste(self.img_info, (0,0), self.img_info.split()[3])
-        thumb_card = card.make_thumb_card("1", card.get_thumb_card("1")[0][0], False).convert("RGBA").resize((110, 110), Image.Resampling.LANCZOS)
+        thumb_card = (await card.make_thumb_card(1, (await data.card.get_thumb_res(1))["normal"], False)).convert("RGBA").resize((110, 110), Image.Resampling.LANCZOS)
         im.paste(thumb_card, (39, 36), thumb_card.split()[3])
         font = ImageFont.truetype(font=self.font_path, size = 48)
         font_28 = ImageFont.truetype(font=self.font_path, size = 28)
         draw = ImageDraw.Draw(im)
         draw.text(((448 - self.to_width("等级", font_28))//2, 50), "等级", (81,81,81), font_28)
-        draw.text(((448 - self.to_width(str(data["data"]["profile"]["rank"]), font))//2, 63+8), str(data["data"]["profile"]["rank"]), (81,81,81), font)
-        draw.text((316, 56), data["data"]["profile"]["userName"], (81,81,81), font)
-        draw.text((260, 287), data["data"]["profile"]["introduction"], (81,81,81), font_28)
-        degreeImage = self.make_degree(str(data["data"]["profile"]["degree"]), self.servers_dict[type]).resize((401, 87), Image.Resampling.LANCZOS)
+        draw.text(((448 - self.to_width(str(_data["data"]["profile"]["rank"]), font))//2, 63+8), str(_data["data"]["profile"]["rank"]), (81,81,81), font)
+        draw.text((316, 56), _data["data"]["profile"]["userName"], (81,81,81), font)
+        draw.text((260, 287), _data["data"]["profile"]["introduction"], (81,81,81), font_28)
+        degreeImage = self.make_degree(str(_data["data"]["profile"]["degree"]), self.servers_dict[type]).resize((401, 87), Image.Resampling.LANCZOS)
         im = ImageUtils.paste(im, degreeImage, (40, 164))
         return im
     
-    def make_total_desk_power_img(self, data: dict) -> Image.Image:
+    async def make_total_desk_power_img(self, _data: dict) -> Image.Image:
         '''
         绘制乐队图片
         '''
@@ -1071,24 +1539,31 @@ class PlayerState(object):
         im.paste(self.img_basic_band_info, (0,0), self.img_basic_band_info.split()[3])
         font_36 = ImageFont.truetype(font=self.font_path, size = 36)
         font_26 = ImageFont.truetype(font=self.font_path, size = 26)
-        power = 0
-        for i in data["data"]["profile"]["mainDeckUserSituations"]["entries"]:
-            power += card.get_power(str(i["situationId"]), str(i["level"]), i["trainingStatus"])
+        card_stats, areaitem_dict = {}, {}
+
+        for i in _data["data"]["profile"]["mainDeckUserSituations"]["entries"]:
+            card_stats[i["situationId"]] = await data.card.get_level_stat(i["situationId"], str(i["level"]), i["trainingStatus"] == "done")
+
+        for i in _data["data"]["profile"]["enabledUserAreaItems"]["entries"]:
+            areaitem_dict[str(i["areaItemCategory"])] = str(i["level"])
+
+        final_stat = await data.calculate_final_stat(card_stats, areaitem_dict)
+
         draw = ImageDraw.Draw(im)
-        draw.text((908, 34-28), str(power), (255,255,255), font_36)
-        cards = data["data"]["profile"]["mainDeckUserSituations"]["entries"]
+        draw.text((908, 34-28), str(int(final_stat["total"])), (255,255,255), font_36)
+        cards = _data["data"]["profile"]["mainDeckUserSituations"]["entries"]
         cards[0], cards[1], cards[2], cards[3] = cards[3], cards[1], cards[0], cards[2]
 
         for i,v in enumerate(cards):
-            thumb: Image.Image = card.extra_get_thumb_card(str(v["situationId"]), v["illust"], v["trainingStatus"]).resize((189,189), Image.Resampling.BILINEAR)
-            thumb = ImageUtils.paste(thumb, card.level_img, (thumb.width - 8 - card.level_img.width, thumb.height - 8 - card.level_img.height))
+            thumb: Image.Image = (await card.extra_get_thumb_card(str(v["situationId"]), v["illust"], v["trainingStatus"])).resize((189,189), Image.Resampling.BILINEAR)
+            thumb = ImageUtils.paste(thumb, data.card.level_img, (thumb.width - 8 - data.card.level_img.width, thumb.height - 8 - data.card.level_img.height))
             draw_thumb = ImageDraw.Draw(thumb)
             draw_thumb.text((149, 151), str(v["level"]), (254,254,254), font_26)
             im.paste(thumb, (42 + 202*i, 96-28), thumb.split()[3])
         im.paste(self.img_frame_leader, (441, 90-28), self.img_frame_leader.split()[3])
         return im
     
-    def make_band_rank_img(self, data: dict) -> Image.Image:
+    async def make_band_rank_img(self, _data: dict) -> Image.Image:
         '''
         绘制乐队等级
         '''
@@ -1097,14 +1572,14 @@ class PlayerState(object):
         font_32 = ImageFont.truetype(font=self.font_path, size=32)
         draw = ImageDraw.Draw(im)
         for i,v in enumerate(["1", "2", "4", "5", "3"]):
-            level = str(data["data"]["profile"]["bandRankMap"]["entries"][v])
+            level = str(_data["data"]["profile"]["bandRankMap"]["entries"][v])
             draw.text((94+(45-self.to_width(level, font_32))//2 + i*213, 153), level, (80,80,80), font_32)
         for i,v in enumerate(["21", "18"]):
-            level = str(data["data"]["profile"]["bandRankMap"]["entries"][v])
+            level = str(_data["data"]["profile"]["bandRankMap"]["entries"][v])
             draw.text((94+(45-self.to_width(level, font_32))//2 + i*213, 279), level, (80,80,80), font_32)
         return im
     
-    def make_music_img(self, data: dict, type: str) -> Image.Image:
+    async def make_music_img(self, data: dict, type: str) -> Image.Image:
         '''
         绘制歌曲信息
         '''
@@ -1124,7 +1599,7 @@ class PlayerState(object):
                 sum += 210
         return im
 
-    def trans_jp_music_to_cn(self, jp_dict: dict):
+    async def trans_jp_music_to_cn(self, jp_dict: dict):
         '''
         用于日服歌曲信息到国服的转换
         '''
@@ -1150,52 +1625,60 @@ class PlayerState(object):
             "allPerfectMusicCountMap": {"entries": perfect_count_map}
         }
 
-    def init_img(self, uid: str, data: dict, type: str) -> Image.Image:
+    async def init_img(self, uid: str, _data: dict, type: str) -> Image.Image:
         '''
         初始化图片
         `uid`: 玩家ID
-        `data`: API请求下来的数据
+        `_data`: API请求下来的数据
         `type`: cn/jp
         '''
         imgs = []
-        if data["data"]["profile"].get("userProfileSituation") and data["data"]["profile"].get("userProfileDegreeMap"):
-            imgs.append(self.make_info_img(data, type))
+        if _data["data"]["profile"].get("userProfileSituation") and _data["data"]["profile"].get("userProfileDegreeMap"):
+            imgs.append(await self.make_info_img(_data, type))
         else:
-            imgs.append(self.make_simple_info_img(data, type))
-        if data["data"]["profile"]["publishTotalDeckPowerFlg"]:
-            imgs.append(self.make_total_desk_power_img(data))
-        if data["data"]["profile"]["publishBandRankFlg"]:
-            imgs.append(self.make_band_rank_img(data))
+            imgs.append(await self.make_simple_info_img(_data, type))
+        if _data["data"]["profile"]["publishTotalDeckPowerFlg"]:
+            imgs.append(await self.make_total_desk_power_img(_data))
+        if _data["data"]["profile"]["publishBandRankFlg"]:
+            imgs.append(await self.make_band_rank_img(_data))
         if type == "jp":
-            music_data = self.trans_jp_music_to_cn(data["data"]["profile"])
-            if music_data.get("clearedMusicCountMap"):
-                data["data"]["profile"]["clearedMusicCountMap"] = music_data.get("clearedMusicCountMap")
-            if music_data.get("fullComboMusicCountMap"):
-                data["data"]["profile"]["fullComboMusicCountMap"] = music_data.get("fullComboMusicCountMap")
-            if music_data.get("allPerfectMusicCountMap"):
-                data["data"]["profile"]["allPerfectMusicCountMap"] = music_data.get("allPerfectMusicCountMap")
-        if data["data"]["profile"]["publishMusicClearedFlg"]:
-            imgs.append(self.make_music_img(data, "cleared"))
-        if data["data"]["profile"]["publishMusicFullComboFlg"]:
-            imgs.append(self.make_music_img(data, "full_combo"))
-        if data["data"]["profile"]["publishMusicAllPerfectFlg"]:
-            imgs.append(self.make_music_img(data, "all_perfect"))
+            music__data = await self.trans_jp_music_to_cn(_data["data"]["profile"])
+            if music__data.get("clearedMusicCountMap"):
+                _data["data"]["profile"]["clearedMusicCountMap"] = music__data.get("clearedMusicCountMap")
+            if music__data.get("fullComboMusicCountMap"):
+                _data["data"]["profile"]["fullComboMusicCountMap"] = music__data.get("fullComboMusicCountMap")
+            if music__data.get("allPerfectMusicCountMap"):
+                _data["data"]["profile"]["allPerfectMusicCountMap"] = music__data.get("allPerfectMusicCountMap")
+        if _data["data"]["profile"]["publishMusicClearedFlg"]:
+            imgs.append(await self.make_music_img(_data, "cleared"))
+        if _data["data"]["profile"]["publishMusicFullComboFlg"]:
+            imgs.append(await self.make_music_img(_data, "full_combo"))
+        if _data["data"]["profile"]["publishMusicAllPerfectFlg"]:
+            imgs.append(await self.make_music_img(_data, "all_perfect"))
 
         result = ImageUtils.merge_images(imgs, "v", 8, 0, 32, (255, 255, 255, 255))
         draw = ImageDraw.Draw(result)
 
-        ImageUtils.border_text(draw, (4, result.height - 30), "UID: "+uid, ImageFont.truetype(font=self.font_path, size = 24), (50,50,50), (255,255,255))
+        dt = datetime.datetime.fromtimestamp(_data['data']['time'] / 1000)
+        time_str = dt.strftime("%m/%d %H:%M")
+
+        info = f"UID {uid} | CACHE {_data['data']['cache']} | TIME {time_str} ({type.upper()})"
+        ImageUtils.border_text(draw, (4, result.height - 30), info, ImageFont.truetype(font=self.font_path, size = 24), (50,50,50), (255,255,255))
         return result
     
-    def get(self, uid: str, type: str) -> Image.Image:
+    async def get(self, uid: str, type: str) -> Image.Image:
         '''
         `uid`: 玩家ID
         `type`: cn/jp
         '''
         url = f"https://bestdori.com/api/player/{type}/{uid}?mode=2"
-        data = json.loads(requests.get(url).text)
-        result = self.init_img(uid, data, type)
-        result.paste(card.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=card.watermark.split()[3])
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                _data = await response.text()
+                _data = json.loads(_data)
+        result = await self.init_img(uid, _data, type)
+        result.paste(data.card.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=data.card.watermark.split()[3])
         return result
 
 player_state = PlayerState()
+

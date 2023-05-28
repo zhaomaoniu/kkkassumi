@@ -34,17 +34,3 @@ https://bestdori.com/assets/jp/thumb/chara/card00005_rip/res006012_normal.png
 https://bestdori.com/assets/cn/thumb/chara/card00200_rip/res023500_normal.png
 https://bestdori.com/assets/jp/thumb/chara/card00033_rip/res016070_normal.png
 https://bestdori.com/assets/cn/thumb/chara/card00200_rip/res022500_normal.png
-https://bestdori.com/assets/cn/thumb/chara/card00200_rip/res021500_normal.png
-https://bestdori.com/assets/cn/thumb/chara/card00200_rip/res013501_normal.png
-https://bestdori.com/assets/cn/thumb/chara/card00200_rip/res005501_normal.png
-https://bestdori.com/assets/cn/thumb/chara/card00200_rip/res017501_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res024500_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res011501_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res023500_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res013501_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res024501_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res025500_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res021500_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res005501_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res017501_rip/card_normal.png
-https://bestdori.com/assets/cn/characters/resourceset/res022500_rip/card_normal.png

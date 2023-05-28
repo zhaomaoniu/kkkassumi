@@ -7,7 +7,7 @@
 
 很多地方都写的不足，以后会慢慢改的。
 
-README.md和部分项目结构参考了 [绪山真寻Bot](https://github.com/nonebot/nonebot2)
+README.md和部分项目结构参考了 [绪山真寻Bot](https://github.com/HibiKier/zhenxun_bot)
 
 （以后香澄的代码都会慢慢传上来）
 
@@ -31,25 +31,40 @@ TODO: 给ImageUtils.text2img()加上字间距的参数
 
 代码里写了爬取Bestdori的资源的Download类，不是很完善，可能需要多下几遍才能爬完所有需要的资源（非Bestdori的资源已经放在仓库里了）
 
-具体使用方法可以参照player_state.get()和player_state.get()的注释，下面是用例
+具体使用方法可以参照player_state.get()和player_state.get()的注释，下面是用例(异步函数中直接调用即可)
 
 ```python
-from utils.BestdoriUtils import player_state, card
+import asyncio
 
-uid = "1006954716"
-server = "cn"
+from utils.BestdoriUtils import data, card, player_state
 
-# 获取玩家信息
-player_state.get(uid, server).save(f"{uid}.png")
 
-# 获取卡牌信息
-card.get("查卡 1145")
+# 初始化，用于获取数据
+asyncio.get_event_loop().run_until_complete(data.initialize())
+
+# 查卡
+asyncio.get_event_loop().run_until_complete(card.get("查卡 ksm")).show()
+
+# 玩家状态
+asyncio.get_event_loop().run_until_complete(player_state.get("1006954716", "cn")).show()
 ```
+
+## 更新日志
+
+### 23/05/28
+
+- 修改了BestdoriUtils的结构，现在更方便拓展了
+- 玩家状态现在能够精准计算乐队综合力
+- 卡牌缩略图现在更像游戏内的了，在左上角加上了乐队图标
+- 全部改用异步函数，提升了运行效率（大概？）
 
 ## 感谢
 
 [botuniverse / onebot](https://github.com/botuniverse/onebot) ：超棒的机器人协议  
-[Mrs4s / go-cqhttp](https://github.com/Mrs4s/go-cqhttp) ：cqhttp的golang实现，轻量、原生跨平台.  
+[Mrs4s / go-cqhttp](https://github.com/Mrs4s/go-cqhttp) ：cqhttp的golang实现，轻量、原生跨平台  
 [nonebot / nonebot2](https://github.com/nonebot/nonebot2) ：跨平台Python异步机器人框架  
 [HibiKier / zhenxun_bot](https://github.com/HibiKier/zhenxun_bot) : 非常可爱的绪山真寻bot  
-[kumoSleeping / xiaoxiaopa](https://github.com/kumoSleeping/xiaoxiaopa) : kumo自主研发的小小趴bot
+[kumoSleeping / xiaoxiaopa](https://github.com/kumoSleeping/xiaoxiaopa) : kumo自主研发的小小趴bot   
+[Bestdori](https://bestdori.com/) : BanG Dream最大的第三方网站
+
+还有很多群友的帮助！
