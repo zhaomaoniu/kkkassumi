@@ -728,10 +728,16 @@ class _Card:
         res_info, server = await self._get_res_info(card_id)
         normal, trained = res_info["normal"], res_info["trained"]
         result = {}
-        if normal:
-            result["normal"] = Image.open(normal_path).convert("RGBA")
-        if trained:
-            result["trained"] = Image.open(training_path).convert("RGBA")
+        try:
+            if normal:
+                result["normal"] = Image.open(normal_path).convert("RGBA")
+        except FileNotFoundError:
+            pass
+        try:
+            if trained:
+                result["trained"] = Image.open(training_path).convert("RGBA")
+        except FileNotFoundError:
+            pass
 
         return result
     
