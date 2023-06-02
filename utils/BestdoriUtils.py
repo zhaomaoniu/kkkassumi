@@ -10,8 +10,9 @@ from typing import Tuple
 
 import aiohttp
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from threading import Thread
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from nonebot.log import logger
 
@@ -184,7 +185,7 @@ class _Card:
         await self._load_imgs()
         await self._load_texts()
 
-        self._scheduler = BackgroundScheduler()
+        self._scheduler = AsyncIOScheduler()
         self._scheduler.add_job(self._get_data, 'interval', hours=1)
         self._scheduler.start()
 
@@ -429,7 +430,7 @@ class _Card:
             '22': ['氷川 紗夜', '氷川紗夜', 'sayo hikawa', 'sayohikawa', '冰川 紗夜', '冰川紗夜', '冰川 纱夜', '冰川纱夜', '紗夜', 'sayo', '紗夜', '纱夜', 'hikawa'],
             '23': ['今井 リサ', '今井リサ', 'lisa imai', 'lisaimai', '今井 莉莎', '今井莉莎', '今井 莉莎', '今井莉莎', 'リサ', 'lisa', '莉莎', '莉莎', '今井', 'imai', '今井', '今 井', 'risa', 'Lisa姐', 'Lisa内', '锂砂镍'],
             '24': ['宇田川 あこ', '宇田川あこ', 'ako udagawa', 'akoudagawa', '宇田川 亞 子', '宇田川亞子', '宇田川 亚子', '宇田川亚子', 'あこ', 'ako', '亞子', '亚子', 'udagawa', '阿仔', '小亚子'],
-            '25': ['白 金 燐子', '白金燐子', 'rinko shirokane', 'rinkoshirokane', '白金 燐子', '白金燐子', '白金 燐子', '白金燐子', '燐子', 'rinko', '燐子', '燐子', '白金', 'shirokane', '白金', '白金', 'rinrin', '燐', '燐', '燐燐', '燐仔', '燐姐', '小燐', '燐可', '……', '提词姬', '燐燐'],
+            '25': ['白金 燐子', '白金燐子', 'rinko shirokane', 'rinkoshirokane', '白金 燐子', '白金燐子', '白金 燐子', '白金燐子', '燐子', 'rinko', '燐子', '燐子', '白金', 'shirokane', '白金', '白金', 'rinrin', '燐', '燐', '燐燐', '燐仔', '燐姐', '小燐', '燐可', '……', '提词姬', '燐燐'],
             '26': ['倉田 ましろ', '倉田ましろ', 'mashiro kurata', 'mashirokurata', '倉田 真白', '倉田真白', 'ましろ', 'mashiro', '真白', '倉田', 'kurata', '倉田', '仓田真白', '仓田 真白', 'msr', '小白', '小哥', '仓神', ' 小我7邀'],
             '27': ['桐ヶ谷 透子', '桐ヶ谷透子', 'toko kirigaya', 'tokokirigaya', '桐谷 透子', '桐谷透子', '透子', 'toko', '透子', ' 桐ヶ谷', 'kirigaya', '桐谷'],
             '28': ['広町 七深', '広町七深', 'nanami hiromachi', 'nanamihiromachi', '廣町 七深', '廣町七深', '七深', 'nanami', '七深', '広町', 'hiromachi', '廣町', 'nnm', 'nil'],
@@ -667,7 +668,7 @@ class _Card:
         '''
         获取卡牌的最大综合力
         '''
-        return await self.get_level_stat(card_id, await self.get_trained_level(card_id), True)
+        return await self.get_level_stat(card_id, await self.get_trained_level(card_id), (await self._get_res_info(card_id))[0]["trained"])
 
     @check_initialized
     async def get_character_ids(self, character_name: str):
@@ -754,10 +755,16 @@ class _Card:
         res_info, server = await self._get_res_info(card_id)
         normal, trained = res_info["normal"], res_info["trained"]
         result = {}
-        if normal:
-            result["normal"] = Image.open(normal_path).convert("RGBA")
-        if trained:
-            result["trained"] = Image.open(training_path).convert("RGBA")
+        try:
+            if normal:
+                result["normal"] = Image.open(normal_path).convert("RGBA")
+        except FileNotFoundError:
+            pass
+        try:
+            if trained:
+                result["trained"] = Image.open(training_path).convert("RGBA")
+        except FileNotFoundError:
+            pass
 
         return result
     
@@ -782,7 +789,7 @@ class _Skill:
 
         await self._get_data()
 
-        self._scheduler = BackgroundScheduler()
+        self._scheduler = AsyncIOScheduler()
         self._scheduler.add_job(self._get_data, 'interval', hours=1)
         self._scheduler.start()
 
@@ -831,7 +838,7 @@ class _AreaItem:
 
         await self._get_data()
 
-        self._scheduler = BackgroundScheduler()
+        self._scheduler = AsyncIOScheduler()
         self._scheduler.add_job(self._get_data, 'interval', hours=1)
         self._scheduler.start()
 
@@ -1139,7 +1146,7 @@ class Card(object):
 
     async def make_title(self, _data: dict) -> Image.Image:
         band_id: str = str((_data["characterId"] - 1) // 5 + 1)
-        prefix: str = _data["prefix"][CN] or _data["prefix"][JP]
+        prefix: str = _data["prefix"][CN] or _data["prefix"][JP] or _data["prefix"][TW] or _data["prefix"][EN] or _data["prefix"][KR]
         prefix_width = math.ceil(get_font("grpcn", 36).getlength(prefix))
         character_name: str = data.card.characterId2name[str(_data['characterId'])][0]
         character_name_width = math.ceil(get_font("grpcn", 45).getlength(character_name))
@@ -1188,7 +1195,7 @@ class Card(object):
         return result
     
     async def make_released_time(self, _data: dict) -> Image.Image:
-        released_text = "\n".join([await self.timestamp_to_datetime(i) + [" (JP)", " (EN)", " (TW)", " (CN)", " (KR)"][idx] for idx, i in enumerate(_data["releasedAt"]) if i and idx in [0, 3]])
+        released_text = "\n".join([await self.timestamp_to_datetime(i) + [" (JP)", " (EN)", " (TW)", " (CN)", " (KR)"][idx] for idx, i in enumerate(_data["releasedAt"]) if (i and idx in [0, 3]) or (i and idx == 2 and not _data["releasedAt"][JP])])
         return ImageUtils.paste(Image.open(os.path.abspath(f'./data/card/res/released_time.png')).crop((0, 0, 1006, 72 + 40 * (released_text.count("\n") + 1))).convert("RGBA"),
                                 ImageUtils.text2img(released_text,
                                     {
@@ -1236,12 +1243,21 @@ class Card(object):
         imgs.append(await self.make_skill_level())
         imgs.append(await self.make_skill(id))
 
-        result = ImageUtils.merge_images(imgs, "v", 16, 0, 32, (255, 255, 255, 255))
-        draw = ImageDraw.Draw(result)
+        img = ImageUtils.merge_images(imgs, "v", 16, 0, 32, (255, 255, 255, 255))
+        draw = ImageDraw.Draw(img)
 
-        ImageUtils.border_text(draw, (4, result.height - 28), "ID: " + str(id), get_font("grpjp", 24), (0,0,0), (255,255,255))
+        ImageUtils.border_text(draw, (4, img.height - 28), "ID " + str(id), get_font("grpjp", 24), (0,0,0), (255,255,255))
 
-        return result
+        base = ImageUtils.add_circle_corn(img, 16, frame_width=1, frame_color=(240, 240, 240))
+
+        bg = ImageUtils.merge_images((await data.card.get_res(id)).values(), "v", 0, 0, 0).resize((base.width + 64, 1334 // 1002 * base.width), Image.Resampling.BICUBIC)
+        
+        result = Image.new("RGBA", (base.width + 64, base.height + 64), (255, 255, 255))
+
+        for i in range(0, base.height // bg.height + 1):
+            result.paste(bg, (0, bg.height * i))
+        
+        return ImageUtils.paste(result.filter(ImageFilter.GaussianBlur(radius=4)), base, (32, 32))
     
     async def adjust_list(self, obj):
         """
@@ -1358,7 +1374,7 @@ class Card(object):
                 else:
                     cfg["characterId"] += await data.card.get_character_ids(i)
             result = await self.get_cards(cfg.get("characterId"), cfg.get("bandId"), cfg.get("attribute"), cfg.get("rarity"), cfg.get("type"))
-        result.paste(data.card.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=data.card.watermark.split()[3])
+        # result.paste(data.card.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=data.card.watermark.split()[3])
         return result
 
 card = Card()

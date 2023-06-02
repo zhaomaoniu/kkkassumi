@@ -1,6 +1,6 @@
 # coding=UTF8
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from typing import List, Tuple
 from math import ceil
 import jieba
@@ -164,6 +164,32 @@ class ImageUtils:
                 x_offset += image.width + spacing
 
         return merged_image
+    
+    @staticmethod
+    def add_circle_corn(img: Image.Image, radius: int = 8, color: Tuple[int, int, int, int] = (255, 255, 255, 255), frame_color: Tuple[int, int, int, int] = (200, 200, 200, 255), background_color: Tuple[int, int, int, int] = (0, 0, 0, 0), frame_width: int = 4):
+        circle = Image.new('RGBA', (radius * 2, radius * 2), background_color)
+        draw = ImageDraw.Draw(circle)
+        draw.ellipse((0, 0, radius * 2, radius * 2), fill=color)
+
+        result = Image.new("RGBA", (img.width + 2 * radius, img.height + 2 * radius), background_color)
+        w, h = result.size
+
+        result.paste(circle.crop((0, 0, radius, radius)), (0, 0))  # 左上角
+        result.paste(circle.crop((radius, 0, radius * 2, radius)), (w - radius, 0))  # 右上角
+        result.paste(circle.crop((radius, radius, radius * 2, radius * 2)), (w - radius, h - radius))  # 右下角
+        result.paste(circle.crop((0, radius, radius, radius * 2)), (0, h - radius))  # 左下角
+
+        draw = ImageDraw.Draw(result)
+        draw.rectangle((radius, 0, w - radius, radius), color)
+        draw.rectangle((0, radius, radius, h - radius), color)
+        draw.rectangle((w - radius, radius, w, h - radius), color)
+        draw.rectangle((radius, h - radius, w - radius, h), color)
+
+        draw.rounded_rectangle(result.getbbox(), outline=frame_color, width=frame_width, radius=radius)
+
+        result = ImageUtils.paste(result, img.convert("RGBA"), (radius, radius))
+
+        return result
 
     @staticmethod
     def paste(background: Image.Image, overlay: Image.Image, box: Tuple[int, int]) -> Image.Image:
@@ -250,7 +276,7 @@ class ImageUtils:
         words = new_words
 
         data = ImageUtils.__words2lines(words, width, x_padding, y_padding, fill, font, line_spacing, x_offset, y_offset)
-        height = max(i["xy"][1] for i in data) + y_padding + ceil(font.getbbox("戸山香澄ToyamaKasumi")[3])
+        height = max(i["xy"][1] for i in data or [{"xy": (0, 0)}]) + y_padding + ceil(font.getbbox("戸山香澄ToyamaKasumi")[3])
         result = Image.new("RGBA", (width, height), bg_fill)
         draw = ImageDraw.Draw(result)
         for i in data:

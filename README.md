@@ -35,18 +35,16 @@ TODO: 给ImageUtils.text2img()加上字间距的参数
 
 ```python
 import asyncio
-
 from utils.BestdoriUtils import data, card, player_state
 
+async def main():
+    await data.initialize()
+    (await card.get("查卡 1399")).save("cache/temp.png")
+    (await player_state.get("1006954716", "cn")).show()
 
-# 初始化，用于获取数据
-asyncio.get_event_loop().run_until_complete(data.initialize())
 
-# 查卡
-asyncio.get_event_loop().run_until_complete(card.get("查卡 ksm")).show()
-
-# 玩家状态
-asyncio.get_event_loop().run_until_complete(player_state.get("1006954716", "cn")).show()
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## 更新日志
