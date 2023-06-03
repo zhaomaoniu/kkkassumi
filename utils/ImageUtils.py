@@ -220,6 +220,39 @@ class ImageUtils:
 
         # 返回合并后的图片
         return background
+    
+    @staticmethod
+    def text(img: Image.Image, xy: Tuple[int, int], text: str, fill: Tuple[int, int, int], font: ImageFont.ImageFont, fallback_font: ImageFont.ImageFont = None, fallback_x_offset: int = 0, fallback_y_offset: int = 0):
+        '''
+        - `draw.text()` 的功能拓展，主要用于处理文本中含有字体无法正常绘制的字符的情况
+
+        :param img: 背景图片
+        :param xy: 文本绘制坐标
+        :param text: 文本
+        :param fill: 文本颜色
+        :param font: 主字体
+        :param fallback_font: 备用字体
+        :param fallback_x_offset: 备用字体左右偏移量
+        :param fallback_y_offset: 备用字体上下偏移量
+
+        :return: 返回合并后的图片
+        '''
+        return ImageUtils.paste(
+            img,
+            ImageUtils.text2img(text, 
+                                {"width": ceil(font.getlength(text)) * 2, 
+                                 "x_padding": 0,
+                                 "y_padding": 0,
+                                 "fill": fill,
+                                 "bg_fill": (0, 0, 0, 0),
+                                 "font": font,
+                                 "fallback_font": fallback_font,
+                                 "fallback_x_offset": fallback_x_offset,
+                                 "fallback_y_offset": fallback_y_offset
+                                 }
+                ),
+            xy
+        )
 
     @staticmethod
     def text2img(text: str,
@@ -230,9 +263,12 @@ class ImageUtils:
                     "fill": (80, 80, 80),
                     "bg_fill": (255, 255, 255),
                     "font": ImageFont.truetype(font=os.path.abspath("data/fonts/GB18030.ttf"), size=36),
+                    "fallback_font": None,
                     "line_spacing": 0,
                     "x_offset": 0,
-                    "y_offset": 0
+                    "y_offset": 0,
+                    "fallback_x_offset": 0,
+                    "fallback_y_offset": 0
                 }
         ):
         '''
@@ -249,9 +285,12 @@ class ImageUtils:
         | `fill` | 文字颜色 | `(80, 80, 80)` |
         | `bg_fill` | 背景颜色 | `(255, 255, 255)` |
         | `font` | 字体 | `ImageFont.truetype(font=os.path.abspath("data/fonts/GB18030.ttf"), size=36)` |
+        | `fallback_font` | 备用字体 | `None` |
         | `line_spacing` | 行间距 | `0` |
         | `x_offset` | 左右偏移量，正为右，负为左 | `0` |
         | `y_offset` | 上下偏移量，正为下，负为上 | `0` |
+        | `fallback_x_offset` | 备用字体左右偏移量，正为右，负为左 | `0` |
+        | `fallback_y_offset` | 备用字体上下偏移量，正为下，负为上 | `0` |
 
         :return: 图片
         '''
@@ -261,9 +300,12 @@ class ImageUtils:
         fill: tuple = cfg.get("fill", (80, 80, 80)) 
         bg_fill: tuple = cfg.get("bg_fill", (255, 255, 255))
         font: ImageFont.ImageFont = cfg.get("font", ImageFont.truetype(font=os.path.abspath("data/fonts/GB18030.ttf"), size=36))
+        fallback_font: ImageFont.ImageFont = cfg.get("fallback_font")
         line_spacing: int = cfg.get("line_spacing", 0)
         x_offset: int = cfg.get("x_offset", 0)
         y_offset: int = cfg.get("y_offset", 0)
+        fallback_x_offset = cfg.get("fallback_x_offset", 0)
+        fallback_y_offset = cfg.get("fallback_y_offset", 0)
 
         words = jieba.lcut(text, cut_all=False)
         new_words = []
@@ -280,5 +322,9 @@ class ImageUtils:
         result = Image.new("RGBA", (width, height), bg_fill)
         draw = ImageDraw.Draw(result)
         for i in data:
-            draw.text(i["xy"], i["text"], i["fill"], i["font"])
+            if font.getmask(i["text"]).getbbox() == font.getmask(chr(1234)).getbbox() and fallback_font:
+                i["font"] = fallback_font
+                draw.text((i["xy"][0] + fallback_x_offset, i["xy"][1] + fallback_y_offset), i["text"], i["fill"], i["font"])
+            else:
+                draw.text(i["xy"], i["text"], i["fill"], i["font"])
         return result
