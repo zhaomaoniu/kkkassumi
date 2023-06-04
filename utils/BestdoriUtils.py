@@ -18,7 +18,7 @@ from nonebot.log import logger
 
 from utils.ImageUtils import ImageUtils
 
-USE_CACHE = False
+USE_CACHE = True
 JP, EN, TW, CN, KR = 0, 1, 2, 3, 4
 
 class Download(object):
@@ -1211,6 +1211,27 @@ class _Event:
         return self.__summary_data__[event_id]["eventName"]
     
     @check_initialized
+    async def get_start_at(self, event_id: str) -> list:
+        return self.__summary_data__[event_id]["startAt"]
+    
+    @check_initialized
+    async def get_event_start_time(self, event_id: str) -> list:
+        async def timestamp_to_datetime(timestamp: int) -> str:
+            if timestamp:
+                timestamp = int(timestamp) / 1000  # 转换为秒级时间戳
+                dt = datetime.datetime.fromtimestamp(timestamp)
+                chinese_datetime = dt.strftime("%Y年%#m月%#d日, %I:%M %p")
+                return chinese_datetime
+            
+        start_at = await self.get_start_at(event_id)
+        return [await timestamp_to_datetime(i) + [" (JP)", " (EN)", " (TW)", " (CN)", " (KR)"][idx] for idx, i in enumerate(start_at) if (i and idx in [0, 3]) or (i and idx == 2 and not start_at[JP])]
+    
+    @check_initialized
+    async def get_servers(self, event_id: str) -> list:
+        start_at = await self.get_start_at(event_id)
+        return [["JP", "EN", "TW", "CN", "KR"][idx] for idx, timestamp in enumerate(start_at) if timestamp is not None and (idx in [CN, JP] or idx == TW and not start_at[JP])]
+
+    @check_initialized
     async def get_banner_asset_bundle_name(self, event_id: str) -> list:
         return self.__summary_data__[event_id]["bannerAssetBundleName"]
     
@@ -1330,12 +1351,14 @@ class Data(object):
         stats["total"] = sum([stat["total"] for stat in stats.values()])
         return stats
     
-    async def get_jp_event_id(self, card_id: int):
+    async def get_event_id(self, card_id: int, server_id: int):
+        if card_id > 5000:
+            return None
         released_at = await self.card.get_released_at(card_id)
         for event_id, data in (await self.event.get_summary_data()).items():
-            if data["startAt"][JP] == released_at[JP]:
+            if data["startAt"][server_id] == released_at[server_id]:
                 return event_id
-
+            
 data = Data()
 
 
@@ -1590,9 +1613,6 @@ class Card(object):
                             ) 
     
     async def make_event(self, event_id: str):
-        if not event_id:
-            return Image.new("RGBA", (0, 0), (0, 0, 0, 0))
-
         async def transform_event_attributes(data):
             result = {}
             for item in data:
@@ -1614,7 +1634,7 @@ class Card(object):
             return result
 
         event_type = await data.event.get_event_type(event_id)
-        event_info = f"{await data.event.get_type_nickname(event_type)}      ID: {event_id}"
+        event_info = f"{await data.event.get_type_nickname(event_type)} | {' '.join(await data.event.get_servers(event_id))} | ID: {event_id}".strip()
         event_banner = await data.event.get_banner(event_id)
         event_attributes = await data.event.get_attributes(event_id)
         event_characters = await data.event.get_characters(event_id)
@@ -1623,11 +1643,11 @@ class Card(object):
 
         font = get_font("grpcn", 32)
 
-        addition_imgs = [event_banner.resize((1006, event_banner.height * 1006 // event_banner.width), Image.Resampling.BICUBIC), ImageUtils.text2img(event_info, {"width": int(font.getlength(event_info)) * 2, "x_padding": 0, "y_padding": 0, "bg_fill": (0, 0, 0, 0), "font": font})]
+        addition_imgs = [event_banner.resize((1006, event_banner.height * 1006 // event_banner.width), Image.Resampling.BICUBIC), ImageUtils.text2img(event_info, {"width": int(font.getlength(event_info)) + 32, "x_padding": 0, "y_padding": 0, "bg_fill": (0, 0, 0, 0), "font": font})]
         for percent, attributes in attribute_addition.items():
             addition_imgs.append(
                 ImageUtils.merge_images(
-                    [ImageUtils.merge_images([data.card.attribute_thumb_img[attribute] for attribute in attributes], "h", 0, 0, 0, (0, 0, 0, 0)), ImageUtils.text2img(f" + {percent}%", {"width": int(font.getlength(f" + {percent}%")) * 2, "x_padding": 0, "y_padding": 0, "fill": (80, 80, 80), "bg_fill": (0, 0, 0, 0), "font": font})],
+                    [ImageUtils.merge_images([data.card.attribute_thumb_img[attribute] for attribute in attributes], "h", 0, 0, 0, (0, 0, 0, 0)), ImageUtils.text2img(f" + {percent}%", {"width": int(font.getlength(f" + {percent}%")) + 32, "x_padding": 0, "y_padding": 0, "fill": (80, 80, 80), "bg_fill": (0, 0, 0, 0), "font": font})],
                     "h", 0, 0, 0, (0, 0, 0, 0)
                 )
             )
@@ -1635,7 +1655,7 @@ class Card(object):
         for percent, characters in character_addition.items():
             addition_imgs.append(
                 ImageUtils.merge_images(
-                    [ImageUtils.merge_images([(await data.card.get_chara_icon(character)).resize((45, 45), Image.Resampling.BICUBIC) for character in characters], "h", 0, 0, 0, (0, 0, 0, 0)), ImageUtils.text2img(f" + {percent}%", {"width": int(font.getlength(f" + {percent}%")) * 2, "x_padding": 0, "y_padding": 0, "fill": (80, 80, 80), "bg_fill": (0, 0, 0, 0), "font": font})],
+                    [ImageUtils.merge_images([(await data.card.get_chara_icon(character)).resize((45, 45), Image.Resampling.BICUBIC) for character in characters], "h", 0, 0, 0, (0, 0, 0, 0)), ImageUtils.text2img(f" + {percent}%", {"width": int(font.getlength(f" + {percent}%")) + 32, "x_padding": 0, "y_padding": 0, "fill": (80, 80, 80), "bg_fill": (0, 0, 0, 0), "font": font})],
                     "h", 0, 0, 0, (0, 0, 0, 0)
                 )
             )
@@ -1643,40 +1663,42 @@ class Card(object):
         addition_img = ImageUtils.merge_images(addition_imgs, "v", 12, 0, 0, (0, 0, 0, 0))
 
         return ImageUtils.paste(Image.new("RGBA", addition_img.size, (255, 255, 255)), addition_img, (0, 0))
-
+    
     async def get_card(self, id: int) -> Image.Image:
         _data: dict = await data.card.get_data(id)
-        
+
         imgs = []
-        imgs.append(await self.make_title(_data))
-        imgs.append(await self.make_illustration(_data, id))
-        imgs.append(await self.make_power(id))
-        imgs.append(await self.make_released_time(_data))
-        imgs.append(await self.make_character_level(id))
-        imgs.append(await self.make_skill_level())
-        imgs.append(await self.make_skill(id))
 
-        event_img = await self.make_event(await data.get_jp_event_id(id)
-)
+        base_imgs = []
+        base_imgs.append(await self.make_title(_data))
+        base_imgs.append(await self.make_illustration(_data, id))
+        base_imgs.append(await self.make_power(id))
+        base_imgs.append(await self.make_released_time(_data))
+        base_imgs.append(await self.make_character_level(id))
+        base_imgs.append(await self.make_skill_level())
+        base_imgs.append(await self.make_skill(id))
 
-        img = ImageUtils.merge_images(imgs, "v", 16, 0, 32, (255, 255, 255, 255))
-        draw = ImageDraw.Draw(img)
+        base = ImageUtils.add_circle_corn(ImageUtils.merge_images(base_imgs, "v", 16, 0, 32, (255, 255, 255, 255)), 16, frame_width=4, frame_color=(255, 255, 255))
 
-        ImageUtils.border_text(draw, (4, img.height - 28), "ID " + str(id), get_font("grpjp", 24), (0,0,0), (255,255,255))
+        draw = ImageDraw.Draw(base)
+        ImageUtils.border_text(draw, (10, base.height - 34), "ID " + str(id), get_font("grpjp", 24), (0,0,0), (255,255,255))
+        imgs.append(base)
 
-        base = ImageUtils.add_circle_corn(img, 16, frame_width=4, frame_color=(240, 240, 240))
-        event_img = ImageUtils.add_circle_corn(event_img, 16, frame_width=4, frame_color=(240, 240, 240))
-        
-        base = ImageUtils.merge_images([base, event_img], "v", 32, 0, 0, (0, 0, 0, 0))
+        jp_event_id, cn_event_id = await data.get_event_id(id, JP), await data.get_event_id(id, CN)
 
-        bg = ImageUtils.merge_images((await data.card.get_res(id)).values(), "v", 0, 0, 0).resize((base.width + 64, 1334 // 1002 * base.width), Image.Resampling.BICUBIC)
-        
-        result = Image.new("RGBA", (base.width + 64, base.height + 64), (255, 255, 255))
+        if cn_event_id or jp_event_id:
+            title = ImageUtils.add_circle_corn(Image.new("RGBA", (320, 64), (234, 78, 115)), 16, (234, 78, 115), (255, 255, 255), frame_width=6)
+            title = ImageUtils.text(title, (int((320 + 32 - get_font("grpcn", 42).getlength("相关活动")) // 2), 12), "相关活动", (255, 255, 255), get_font("grpcn", 42))
+            event_img = ImageUtils.add_circle_corn(await self.make_event(cn_event_id or jp_event_id), 16, frame_width=4, frame_color=(255, 255, 255))
+            imgs.append(ImageUtils.merge_images([title, event_img], "v", -25, 0, 0, (0, 0, 0, 0)))
 
-        for i in range(0, base.height // bg.height + 1):
+        img = ImageUtils.merge_images(imgs, "v", 32, 0, 0, (0, 0, 0, 0))
+        bg = ImageUtils.merge_images((await data.card.get_res(id)).values(), "v", 0, 0, 0).resize((img.width + 64, 1334 // 1002 * img.width), Image.Resampling.BICUBIC)
+        result = Image.new("RGBA", (img.width + 64, img.height + 64), (255, 255, 255))
+        for i in range(0, img.height // bg.height + 1):
             result.paste(bg, (0, bg.height * i))
         
-        return ImageUtils.paste(result.filter(ImageFilter.GaussianBlur(radius=4)), base, (32, 32))
+        return ImageUtils.paste(result.filter(ImageFilter.GaussianBlur(radius=4)), img, (32, 32))
     
     async def adjust_list(self, obj):
         """
@@ -1772,7 +1794,7 @@ class Card(object):
         prompts = prompt[2:].strip().split()
 
         if len(prompts) == 1 and prompts[0].isdigit():
-            result = await self.get_card(prompts[0])
+            result = await self.get_card(int(prompts[0]))
         else:
             cfg = {
                 "attribute": [],
