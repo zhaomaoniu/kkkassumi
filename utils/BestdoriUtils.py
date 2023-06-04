@@ -18,7 +18,7 @@ from nonebot.log import logger
 
 from utils.ImageUtils import ImageUtils
 
-USE_CACHE = True
+USE_CACHE = False
 JP, EN, TW, CN, KR = 0, 1, 2, 3, 4
 
 class Download(object):
@@ -1356,7 +1356,7 @@ class Data(object):
             return None
         released_at = await self.card.get_released_at(card_id)
         for event_id, data in (await self.event.get_summary_data()).items():
-            if data["startAt"][server_id] == released_at[server_id]:
+            if data["startAt"][server_id] == released_at[server_id] and released_at[server_id] is not None:
                 return event_id
             
 data = Data()
