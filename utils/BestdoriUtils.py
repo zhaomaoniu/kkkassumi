@@ -17,7 +17,7 @@ from nonebot.log import logger
 
 from utils.ImageUtils import ImageUtils
 
-USE_CACHE = True
+USE_CACHE = False
 FANCY_BG = False
 JP, EN, TW, CN, KR = 0, 1, 2, 3, 4
 
@@ -1639,7 +1639,7 @@ class Data(object):
     
     async def get_event_id(self, card_id: int, server_id: int):
         '''
-        通过 card_id 匹配 event_id
+        通过 `card_id` 匹配 `event_id`
         '''
         if card_id > 5000:
             return None
@@ -1650,8 +1650,9 @@ class Data(object):
             
     async def get_gacha_id(self, card_id: int, server_id: int = JP):
         source = (await self.card.get_source(card_id))[server_id].get("gacha", {})
+        data = await self.gacha.get_summary_data()
         try:
-            return [gacha_id for gacha_id in source if gacha_id][0]
+            return [gacha_id for gacha_id in source if gacha_id and data[gacha_id]["type"] != "free" and int((await self.card.get_released_at(card_id))[server_id]) <= int(data[gacha_id]["publishedAt"][server_id])][0]
         except IndexError:
             return None
             
