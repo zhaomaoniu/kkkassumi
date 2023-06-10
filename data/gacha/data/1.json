@@ -1,0 +1,1345 @@
+{
+    "details": [
+        {
+            "2": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "3": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "4": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "6": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "7": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "8": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "10": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "11": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "12": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "14": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "15": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "16": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "18": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "19": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "20": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "22": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "23": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "26": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "27": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "30": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "31": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "34": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "35": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "38": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "39": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "42": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "43": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "46": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "47": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "50": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "51": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "54": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "55": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "58": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "59": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "62": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "63": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "66": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "67": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "70": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "71": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "74": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "75": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "78": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "79": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "82": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "83": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "86": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "87": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "90": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "91": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "94": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "95": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "98": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "99": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            }
+        },
+        {
+            "2": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "3": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "4": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "6": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "7": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "8": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "10": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "11": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "12": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "14": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "15": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "16": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "18": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "19": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "20": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "22": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "23": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "26": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "27": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "30": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "31": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "34": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "35": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "38": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "39": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "42": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "43": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "46": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "47": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "50": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "51": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "54": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "55": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "58": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "59": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "62": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "63": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "66": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "67": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "70": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "71": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "74": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "75": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "78": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "79": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "82": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "83": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "86": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "87": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "90": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "91": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "94": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "95": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "98": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "99": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            }
+        },
+        {
+            "2": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "3": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "4": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            }
+        },
+        {
+            "2": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "3": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "4": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "6": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "7": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "8": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "10": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "11": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "12": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "14": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "15": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "16": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "18": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "19": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "20": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "22": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "23": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "26": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "27": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "30": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "31": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "34": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "35": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "38": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "39": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "42": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "43": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "46": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "47": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "50": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "51": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "54": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "55": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "58": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "59": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "62": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "63": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "66": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "67": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "70": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "71": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "74": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "75": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "78": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "79": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "82": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "83": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "86": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "87": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "90": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "91": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "94": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "95": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "98": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "99": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            }
+        },
+        {
+            "2": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "3": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "4": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "6": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "7": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "8": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "10": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "11": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "12": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "14": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "15": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "16": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "18": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "19": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "20": {
+                "rarityIndex": 4,
+                "weight": 1,
+                "pickup": true
+            },
+            "22": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "23": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "26": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "27": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "30": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "31": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "34": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "35": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "38": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "39": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "42": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "43": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "46": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "47": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "50": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "51": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "54": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "55": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "58": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "59": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "62": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "63": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "66": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "67": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "70": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "71": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "74": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "75": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "78": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "79": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "82": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "83": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "86": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "87": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "90": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "91": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "94": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "95": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            },
+            "98": {
+                "rarityIndex": 2,
+                "weight": 1,
+                "pickup": true
+            },
+            "99": {
+                "rarityIndex": 3,
+                "weight": 1,
+                "pickup": true
+            }
+        }
+    ],
+    "rates": [
+        {
+            "1": {
+                "rate": 0,
+                "weightTotal": 0
+            },
+            "2": {
+                "rate": 90,
+                "weightTotal": 25
+            },
+            "3": {
+                "rate": 8.5,
+                "weightTotal": 25
+            },
+            "4": {
+                "rate": 1.5,
+                "weightTotal": 5
+            }
+        },
+        {
+            "1": {
+                "rate": 0,
+                "weightTotal": 0
+            },
+            "2": {
+                "rate": 88.5,
+                "weightTotal": 25
+            },
+            "3": {
+                "rate": 8.5,
+                "weightTotal": 25
+            },
+            "4": {
+                "rate": 3,
+                "weightTotal": 5
+            }
+        },
+        {
+            "1": {
+                "rate": 0,
+                "weightTotal": 0
+            },
+            "2": {
+                "rate": 90,
+                "weightTotal": 1
+            },
+            "3": {
+                "rate": 8.5,
+                "weightTotal": 1
+            },
+            "4": {
+                "rate": 1.5,
+                "weightTotal": 1
+            }
+        },
+        {
+            "1": {
+                "rate": 0,
+                "weightTotal": 0
+            },
+            "2": {
+                "rate": 88.5,
+                "weightTotal": 25
+            },
+            "3": {
+                "rate": 8.5,
+                "weightTotal": 25
+            },
+            "4": {
+                "rate": 3,
+                "weightTotal": 5
+            }
+        },
+        {
+            "1": {
+                "rate": 0,
+                "weightTotal": 0
+            },
+            "2": {
+                "rate": 90,
+                "weightTotal": 25
+            },
+            "3": {
+                "rate": 8.5,
+                "weightTotal": 25
+            },
+            "4": {
+                "rate": 1.5,
+                "weightTotal": 5
+            }
+        }
+    ],
+    "paymentMethods": [
+        {
+            "gachaId": 1,
+            "paymentMethod": "paid_star",
+            "quantity": 60,
+            "paymentMethodId": 1,
+            "count": 1,
+            "behavior": "once_a_day",
+            "pickup": true,
+            "costItemQuantity": 60,
+            "discountType": 0
+        },
+        {
+            "gachaId": 1,
+            "paymentMethod": "free_star",
+            "quantity": 250,
+            "paymentMethodId": 2,
+            "count": 1,
+            "behavior": "normal",
+            "pickup": false,
+            "costItemQuantity": 250,
+            "discountType": 0
+        },
+        {
+            "gachaId": 1,
+            "paymentMethod": "free_star",
+            "quantity": 250,
+            "paymentMethodId": 3,
+            "count": 10,
+            "behavior": "over_the_3_star_once",
+            "pickup": false,
+            "costItemQuantity": 2500,
+            "discountType": 0
+        },
+        {
+            "gachaId": 1,
+            "paymentMethod": "normal_ticket",
+            "quantity": 1,
+            "paymentMethodId": 4,
+            "count": 1,
+            "behavior": "normal",
+            "pickup": false,
+            "costItemQuantity": 1,
+            "discountType": 0,
+            "ticketId": 1
+        }
+    ],
+    "resourceName": "gacha1",
+    "bannerAssetBundleName": "banner-001",
+    "gachaName": [
+        "リリース記念ガチャ",
+        "Release Celebration Gacha",
+        "遊戲上線紀念轉蛋",
+        "开服纪念招募",
+        "오픈 기념 뽑기"
+    ],
+    "publishedAt": [
+        "1462071600000",
+        "1522281600000",
+        "1506830400000",
+        "1462075200000",
+        "1462071600000"
+    ],
+    "closedAt": [
+        "1490335199000",
+        "1523581199000",
+        "1508741999000",
+        "1490331599000",
+        "1490335199000"
+    ],
+    "description": [
+        "★★以上のメンバーが出現！（出現メンバーはすべて特訓前の状態になります。）",
+        "Featuring ★★ and higher members! (All members drop with their pre-Training images.)",
+        "★★以上的團員出現！（出現的團員是特訓前的狀態。）",
+        "必定出现★★以上成员！（出现成员均为特训前状态。）",
+        "★★이상의 멤버가 출현!\n(출현하는 멤버는 모두 특훈 전 상태입니다)"
+    ],
+    "annotation": [
+        "・下記提供割合でメンバーが出現します。\n・｢★3以上1人確定｣は｢確定枠提供割合｣をご確認ください。\n・メンバー毎に表示している提供割合は、\n表示上小数点第4位にて四捨五入しているため、\n全てを合算しても100%にならない場合があります。",
+        "・Members are obtained according to the drop rates below.\n・For \"★3+ Guaranteed\" drops, please check the \"Guaranteed Drop Rates.\"\n・The percentages for drop rates per member are rounded to four decimal places.\n As such, the totals displayed may not add up to 100%.",
+        "・將以下方記載的機率出現對應團員。\n・｢保證１人★３以上｣請於｢必中轉蛋提供比例｣中進行確認。\n・每位團員所表示的出現機率，\n是以小數點第４位進行四捨五入來進行表示，\n所以總合數值可能並非為100%，尚請各位玩家注意。",
+        "・成员将按如下概率出现。\n・｢★3以上1人确定｣请在｢确定成员出现概率｣中确认。\n・由于所显示的各成员出现概率\n均只取到小数点后第4位，\n因此合计数值有可能无法达到100%。",
+        "・아래와 같은 확률로 멤버가 출현합니다.\n・「★3 이상 1명 확정」은「확정 출현 확률」을 참고 바랍니다.\n・멤버마다 표시된 출현 확률은 표시의 편의상\n소수점 네 자리 수 이하는 반올림을 하기 때문에\n모두 합쳐도 100%가 되지 않을 가능성이 있습니다."
+    ],
+    "gachaPeriod": [
+        "03/24 14:59 まで",
+        "Ends 04/13 0:59 UTC",
+        "10/23 14:59 為止",
+        "03/24 12:59 截止",
+        "02/28 22:00 까지"
+    ],
+    "gachaType": "normal",
+    "type": "permanent",
+    "newCards": [],
+    "information": {
+        "description": [
+            null,
+            null,
+            null,
+            null,
+            null
+        ],
+        "term": [
+            "2016/05/01 12:00～2017/03/24 14:59",
+            "2018/03/29 00:00 ～ 2018/04/13 00:59 UTC",
+            "2017/10/01 12:00～2017/10/23 14:59",
+            "2016/05/01 12:00～2017/03/24 14:59",
+            "2016/05/01 12:00 ~ 2017/03/24 14:59"
+        ],
+        "newMemberInfo": [
+            "★2戸山香澄[ステージ]\n★3戸山香澄[約束のキャンディ]\n★4戸山香澄[みんなで遊園地！]\n※他の出現するメンバーにつきましては、提供割合タブにてご確認ください。",
+            "★2 Kasumi Toyama [Onstage]\n★3 Kasumi Toyama [Promised Candy]\n★4 Kasumi Toyama [Theme Park Fun!]\n※Please check the Drop Rates tab for details of other members.",
+            "★2戶山香澄[舞台]\n★3戶山香澄[約束的糖果]\n★4戶山香澄[大家去遊樂園！]\n※請至出現機率頁面查詢其它成員出現機率",
+            "★2户山香澄[舞台]\n★3户山香澄[约定的糖果]\n★4户山香澄[大家在游乐园！]\n※其他成员的出现概率，请在出现概率一览中查看。",
+            "★2 토야마 카스미 [스테이지]\n★3 토야마 카스미 [약속한 캔디]\n★4 토야마 카스미 [모두 함께 놀이동산!]\n※다른 출현 멤버에 대해선 출현 확률 탭에서 확인하시기 바랍니다."
+        ],
+        "notice": [
+            null,
+            null,
+            null,
+            null,
+            null
+        ]
+    }
+}

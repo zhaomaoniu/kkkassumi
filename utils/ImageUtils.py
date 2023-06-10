@@ -166,6 +166,24 @@ class ImageUtils:
         return merged_image
     
     @staticmethod
+    def make_bg(img: Image.Image, size: Tuple[int, int], color: Tuple[int, int, int, int] = (255, 237, 237, 255)):
+        '''
+        使用连续图片生成背景图
+        '''
+        width, height = size
+        width_p, height_p = img.size
+        width_num = ceil(width / width_p)
+        height_num = ceil(height / height_p)
+        result_width = width_p * width_num
+        result_height = height_p * height_num
+        bg = Image.new('RGBA', (result_width, result_height), color)
+        for i in range(width_num):
+            for j in range(height_num):
+                ImageUtils.paste(bg, img, (i * width_p, j * height_p))
+
+        return bg.crop((0, 0, width, height))
+    
+    @staticmethod
     def add_circle_corn(img: Image.Image, radius: int = 8, color: Tuple[int, int, int, int] = (255, 255, 255, 255), frame_color: Tuple[int, int, int, int] = (200, 200, 200, 255), background_color: Tuple[int, int, int, int] = (0, 0, 0, 0), frame_width: int = 4):
         circle = Image.new('RGBA', (radius * 2, radius * 2), background_color)
         draw = ImageDraw.Draw(circle)

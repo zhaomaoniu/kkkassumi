@@ -47,7 +47,28 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+在Nonebot2中，可以使用`get_driver().on_startup`装饰器进行初始化
+```python
+from nonebot import get_driver
+from utils.BestdoriUtils import data
+
+init = get_driver()
+
+@init.on_startup
+async def _():
+    await data.initialize()
+```
+
 ## 更新日志
+
+### 23/06/10
+
+- 给卡牌详细信息添加了卡池信息
+- 修复了部分玩家因AreaItem信息缺失而无法正常查询玩家信息的bug
+- 微调玩家状态的排版，增加了背景，分了板块
+- 增加 `FANCY_BG` 常量，用于控制卡牌背景
+- 微调卡牌详细信息处的文字、图片的位置，使之看起来更加合理
+- 修复了国服活动数据不会更新的bug
 
 ### 23/06/04
 

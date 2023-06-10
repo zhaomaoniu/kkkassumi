@@ -13,12 +13,12 @@ import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from threading import Thread
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.schedulers.background import BackgroundScheduler
 from nonebot.log import logger
 
 from utils.ImageUtils import ImageUtils
 
-USE_CACHE = False
+USE_CACHE = True
+FANCY_BG = False
 JP, EN, TW, CN, KR = 0, 1, 2, 3, 4
 
 class Download(object):
@@ -46,15 +46,16 @@ class Download(object):
             data = requests.get(url, headers = self.headers)
             with open(file_path, 'wb') as f:
                 f.write(data.content)
-                f.close()
+
             if os.path.getsize(file_path) == 14559:
                 os.remove(file_path)
                 logger.warning("DOWNLOAD: Bestdori图片缺失 " + url)
                 with open(os.path.abspath(f'./cache/BadUrl.txt'), "a") as file:
                     file.write(url + "\n")
             else:
-                logger.success("DOWNLOAD: 成功下载 " + url)
+                logger.success(f"DOWNLOAD: 成功下载 {url} ({os.path.getsize(file_path)})")
             self.nowthread -= 1
+            return
         except Exception as e:
             logger.error("DOWNLOAD: ", e)
             self.nowthread -= 1
@@ -149,6 +150,46 @@ class Download(object):
                     else:
                         if self.threadLock.acquire(True):
                             # logger.info(str(self.nowthread) + " thread in running")
+                            self.threadLock.release()
+            except Exception as e:
+                logger.error('DOWNLOAD: ' + str(e))
+
+    def download_gacha_banners(self, li, server: str):
+        __url = "https://bestdori.com/assets/" + server + "/homebanner_rip/{}"
+
+        for res in li:
+            try:
+                while 1:
+                    time.sleep(0.05)
+                    if 0 <= self.nowthread <= self.maxThread:
+                        url = __url.format(res)
+                        if url not in self.get_bad_url():
+                            self.nowthread += 1
+                            Thread(target=self.download_files, args=(url, f"gacha/banners/{server}", res)).start()
+                        break
+                    else:
+                        if self.threadLock.acquire(True):
+                            logger.info(str(self.nowthread) + " thread in running")
+                            self.threadLock.release()
+            except Exception as e:
+                logger.error('DOWNLOAD: ' + str(e))
+
+    def download_screen_banners(self, li, server: str):
+        __url = "https://bestdori.com/assets/" + server + "/gacha/screen/{}_rip/logo.png"
+
+        for res in li:
+            try:
+                while 1:
+                    time.sleep(0.05)
+                    if 0 <= self.nowthread <= self.maxThread:
+                        url = __url.format(res.split("_")[0])
+                        if url not in self.get_bad_url():
+                            self.nowthread += 1
+                            Thread(target=self.download_files, args=(url, f"gacha/banners/{server}", res)).start()
+                        break
+                    else:
+                        if self.threadLock.acquire(True):
+                            logger.info(str(self.nowthread) + " thread in running")
                             self.threadLock.release()
             except Exception as e:
                 logger.error('DOWNLOAD: ' + str(e))
@@ -250,7 +291,7 @@ class _Card:
             if os.path.exists(f'{path}/{card_id}.json'):
                 with open(f'{path}/{card_id}.json', 'r', encoding="UTF-8") as f:
                     card_data: dict = json.load(f)
-                    if not card_data["prefix"][CN] and self.__summary_data__[card_id]["prefix"][CN]:
+                    if card_data["prefix"][CN] is None and self.__summary_data__[card_id]["prefix"][CN]:
                         updated_cards.add(card_id)
             else:
                 updated_cards.add(card_id)
@@ -976,7 +1017,7 @@ class _Degree:
             iconImageName = iconImageName.split("_", 1)[0]
         elif iconImageName.startswith("opening"):
             if rank in ["1", "2", "3"]:
-                iconImageName += rank
+                iconImageName += f"_{rank}"
             else:
                 iconImageName
         elif iconImageName.startswith("event_point_icon"):
@@ -1023,6 +1064,10 @@ class _AreaItem:
         else:
             with open(os.path.abspath("./cache/main.5.json"), 'r', encoding="UTF-8") as f: self.__data__: dict = json.load(f)
         
+        # Bestdori 不提供 AreaItem 的 "59"，我只能自己补上了😓
+        self.__data__["59"] = {"level":[5,5,5,5,5],"areaItemName":["チョココロネ","Chocolate Conch Bun","巧克力海螺包","巧克力海螺包","초콜릿 소라빵"],"description":{"1":["全てのパラメータが0.5%ＵＰ","0.5% boost on all Stats.","所有數值將0.5%ＵＰ","全部成员的属性上升0.5%","모든 파라미터가 0.5% UP"],"2":["全てのパラメータが1%ＵＰ","1% boost on all Stats.","所有數值將1%ＵＰ","全部成员的属性上升1%","모든 파라미터가 1% UP"],"3":["全てのパラメータが1.5%ＵＰ","1.5% boost on all Stats.","所有數值將1.5%ＵＰ","全部成员的属性上升1.5%","모든 파라미터가 1.5% UP"],"4":["全てのパラメータが2%ＵＰ","2% boost on all Stats.","所有數值將2%ＵＰ","全部成员的属性上升2%","모든 파라미터가 2% UP"],"5":["全てのパラメータが2.5%ＵＰ","2.5% boost on all Stats.","所有數值將2.5%ＵＰ","全部成员的属性上升2.5%","모든 파라미터가 2.5% UP"]},"performance":{"1":[0.5,0.5,0.5,0.5,0.5],"2":[1,1,1,1,1],"3":[1.5,1.5,1.5,1.5,1.5],"4":[2,2,2,2,2],"5":[2.5,2.5,2.5,2.5,2.5]},"technique":{"1":[0.5,0.5,0.5,0.5,0.5],"2":[1,1,1,1,1],"3":[1.5,1.5,1.5,1.5,1.5],"4":[2,2,2,2,2],"5":[2.5,2.5,2.5,2.5,2.5]},"visual":{"1":[0.5,0.5,0.5,0.5,0.5],"2":[1,1,1,1,1],"3":[1.5,1.5,1.5,1.5,1.5],"4":[2,2,2,2,2],"5":[2.5,2.5,2.5,2.5,2.5]},"targetAttributes":["pure","powerful","cool","happy"],"targetBandIds":[1,2,3,4,5,21,18]}
+        self._areaitem_backup = {"level":[5,5,5,5,5],"areaItemName":["Unknown","Unknown","Unknown","Unknown","Unknown"],"description":{"1":["Unknown","Unknown","Unknown","Unknown","Unknown"],"2":["Unknown","Unknown","Unknown","Unknown","Unknown"],"3":["Unknown","Unknown","Unknown","Unknown","Unknown"],"4":["Unknown","Unknown","Unknown","Unknown","Unknown"],"5":["Unknown","Unknown","Unknown","Unknown","Unknown"]},"performance":{"1":[0,0,0,0,0],"2":[0,0,0,0,0],"3":[0,0,0,0,0],"4":[0,0,0,0,0],"5":[0,0,0,0,0]},"technique":{"1":[0,0,0,0,0],"2":[0,0,0,0,0],"3":[0,0,0,0,0],"4":[0,0,0,0,0],"5":[0,0,0,0,0]},"visual":{"1":[0,0,0,0,0],"2":[0,0,0,0,0],"3":[0,0,0,0,0],"4":[0,0,0,0,0],"5":[0,0,0,0,0]},"targetAttributes":["pure","powerful","cool","happy"],"targetBandIds":[1,2,3,4,5,21,18]}
+
         for k, data in self.__data__.items():
             for idx, band_id in enumerate(data["targetBandIds"]):
                 if 18 == band_id:
@@ -1034,7 +1079,7 @@ class _AreaItem:
 
     @check_initialized
     async def get_data(self, area_item_category: str) -> dict:
-        return self.__data__[area_item_category]
+        return self.__data__.get(area_item_category, self._areaitem_backup)
     
     @check_initialized
     async def get_performance_data(self, area_item_category: str, level: str) -> int:
@@ -1127,11 +1172,15 @@ class _Event:
             if os.path.exists(f'{path}/{event_id}.json'):
                 with open(f'{path}/{event_id}.json', 'r', encoding="UTF-8") as f:
                     card_data: dict = json.load(f)
-                    if not card_data["eventName"][CN] and self.__summary_data__[event_id]["eventName"][CN]:
+                    if card_data["eventName"][CN] is None and self.__summary_data__[event_id]["eventName"][CN]:
                         updated_events.add(event_id)
             else:
                 updated_events.add(event_id)
         logger.info("DATA.EVENT: 数据校验结束")
+
+        if updated_events:
+            logger.info(f"DATA.EVENT: 国服活动数据更新 {updated_events}")
+            await self._update_event_data(updated_events)
 
         await self._update_event_banner()
 
@@ -1215,6 +1264,10 @@ class _Event:
         return self.__summary_data__[event_id]["startAt"]
     
     @check_initialized
+    async def get_end_at(self, event_id: str) -> list:
+        return self.__summary_data__[event_id]["endAt"]
+    
+    @check_initialized
     async def get_event_start_time(self, event_id: str) -> list:
         async def timestamp_to_datetime(timestamp: int) -> str:
             if timestamp:
@@ -1257,7 +1310,238 @@ class _Event:
     @check_initialized
     async def get_banner(self, event_id: str) -> Image.Image:
         jp_path = os.path.abspath(f"./data/event/banners/jp/{await self.get_banner_asset_bundle_name(event_id)}.png")
-        cn_path = os.path.abspath(f"./data/event/banners/jp/{await self.get_banner_asset_bundle_name(event_id)}.png")
+        cn_path = os.path.abspath(f"./data/event/banners/cn/{await self.get_banner_asset_bundle_name(event_id)}.png")
+        if os.path.exists(cn_path):
+            return Image.open(cn_path).convert("RGBA")
+        return Image.open(jp_path).convert("RGBA")
+
+
+class _Gacha:
+    '''
+    招募信息获取
+    '''
+    def __init__(self):
+        self.initialized = False
+
+    async def initialize(self):
+        logger.info("DATA.GACHA: 正在初始化")
+
+        self._types = {
+            'permanent': "常驻", 
+            'special': "特殊", 
+            'limited': "期间限定", 
+            'dreamfes': "梦想Fes限定", 
+            'miracle': "奇迹", 
+            'free': "免费", 
+            'birthday': "生日", 
+            'kirafes': "闪光Fes限定"
+        }
+
+        await self._get_data()
+
+        self._scheduler = AsyncIOScheduler()
+        self._scheduler.add_job(self._get_data, 'interval', hours=1)
+        self._scheduler.start()
+
+        logger.success("DATA.GACHA: 成功初始化")
+        self.initialized = True
+
+    async def _get_data(self):
+        if not USE_CACHE:
+            summary_url = "https://bestdori.com/api/gacha/all.5.json"
+            self.__summary_data__: dict = json.loads(requests.get(summary_url).text)
+        else:
+            with open(os.path.abspath("./cache/gacha.all.5.json"), 'r', encoding="UTF-8") as f: self.__summary_data__: dict = json.load(f)
+        logger.success("DATA.GACHA: 成功获取招募简略数据")
+
+        path = os.path.abspath("./data/gacha/data")
+
+        # 先判断有没有卡池更新
+        names = []
+        for root, dirs, files in os.walk(path):
+            names += (files)
+
+        gacha_names = {name[:-5] for name in names}
+
+        updated_gachas = set(self.__summary_data__.keys()) - gacha_names
+
+        if updated_gachas:
+            # 如果有卡池更新
+            logger.info(f"DATA.GACHA: 日服招募数据更新 {updated_gachas}")
+            await self._update_gacha_data(updated_gachas)
+        
+        updated_gachas = set()
+
+        # 再检查国服有没有更新
+        # 这里使用`gachaName`判断
+        logger.info("DATA.GACHA: 校验数据中")
+        for gacha_id in self.__summary_data__.keys():
+            if os.path.exists(f'{path}/{gacha_id}.json'):
+                with open(f'{path}/{gacha_id}.json', 'r', encoding="UTF-8") as f:
+                    card_data: dict = json.load(f)
+                    if card_data["gachaName"][CN] is None and self.__summary_data__[gacha_id]["gachaName"][CN]:
+                        updated_gachas.add(gacha_id)
+            else:
+                updated_gachas.add(gacha_id)
+        logger.info("DATA.GACHA: 数据校验结束")
+
+        if updated_gachas:
+            logger.info(f"DATA.GACHA: 国服招募数据更新 {updated_gachas}")
+            await self._update_gacha_data(updated_gachas)
+
+        await self._update_gacha_banner()
+
+    async def _fetch_gacha_data(self, session, gacha_id):
+        url = f"https://bestdori.com/api/gacha/{gacha_id}.json"
+        async with session.get(url) as response:
+            return gacha_id, await response.json()
+
+    async def _update_gacha_data(self, updated_gachas):
+        async with aiohttp.ClientSession() as session:
+            tasks = [self._fetch_gacha_data(session, gacha_id) for gacha_id in updated_gachas]
+            gacha_data_list = await asyncio.gather(*tasks)
+            for gacha_id, gacha_data in gacha_data_list:
+                logger.success(f"DATA.GACHA: 成功获取 {gacha_id} 的详细数据")
+                await asyncio.sleep(0.05)
+                with open(os.path.abspath(f"./data/gacha/data/{gacha_id}.json"), "w", encoding="UTF-8") as json_file:
+                    json.dump(gacha_data, json_file, ensure_ascii=False, indent=4)
+
+    async def _update_gacha_banner(self):
+        res_jp_banner, res_cn_banner, screen_jp_banner, screen_cn_banner = [], [], [], []
+        for v in self.__summary_data__.values():
+            if v.get("bannerAssetBundleName"):
+                res_jp_banner.append(v["bannerAssetBundleName"] + ".png")
+                res_cn_banner.append(v["bannerAssetBundleName"] + ".png")
+            else:
+                screen_jp_banner.append(f"{v['resourceName']}_logo.png")
+                screen_cn_banner.append(f"{v['resourceName']}_logo.png")
+
+        def get_file_name(file_dir):
+            names = []
+            for root, dirs, files in os.walk(file_dir):
+                names += files
+            return names
+
+        miss_jp_banner = list(set(res_jp_banner).difference(set(get_file_name(os.path.abspath(f'./data/gacha/banners/jp')))))
+        miss_cn_banner = list(set(res_cn_banner).difference(set(get_file_name(os.path.abspath(f'./data/gacha/banners/cn')))))
+
+        miss_screen_jp_banner = list(set(screen_jp_banner).difference(set(get_file_name(os.path.abspath(f'./data/gacha/banners/jp')))))
+        miss_screen_cn_banner = list(set(screen_cn_banner).difference(set(get_file_name(os.path.abspath(f'./data/gacha/banners/cn')))))
+
+        for server, bad_banners in (await self._get_bad_banners()).items():
+            for bad_banner in bad_banners:
+                if server == "cn":
+                    if bad_banner in miss_cn_banner:
+                        miss_cn_banner.remove(bad_banner)
+                    if bad_banner in miss_screen_cn_banner:
+                        miss_screen_cn_banner.remove(bad_banner)
+                elif server == "jp":
+                    if bad_banner in miss_jp_banner:
+                        miss_jp_banner.remove(bad_banner)
+                    if bad_banner in miss_screen_jp_banner:
+                        miss_screen_jp_banner.remove(bad_banner)
+
+        if len(miss_jp_banner) > 0 or len(miss_screen_jp_banner) > 0:
+            logger.warning(f"DATA.GACHA: BANNER资源(JP)未下载: {miss_jp_banner} AND {miss_screen_jp_banner}")
+            logger.info("DATA.GACHA: 开始尝试下载BANNER资源(JP)")
+            if miss_jp_banner:
+                download.download_gacha_banners(miss_jp_banner, "jp")
+            if miss_screen_jp_banner:
+                download.download_screen_banners(miss_screen_jp_banner, "jp")
+        else:
+            logger.info("DATA.GACHA: BANNER资源(JP)加载成功")
+
+        if len(miss_cn_banner) > 0 or len(miss_screen_cn_banner) > 0:
+            logger.warning(f"DATA.GACHA: BANNER资源(CN)未下载: {miss_cn_banner} AND {miss_screen_cn_banner}")
+            logger.info("DATA.GACHA: 开始尝试下载BANNER资源(CN)")
+            if miss_cn_banner:
+                download.download_gacha_banners(miss_cn_banner, "cn")
+            if miss_screen_cn_banner:
+                download.download_screen_banners(miss_screen_cn_banner, "cn")
+        else:
+            logger.info("DATA.GACHA: BANNER资源(CN)加载成功")
+
+    async def _get_bad_banners(self) -> dict:
+        bad_banners = {"cn": [], "jp": []}
+        for s in download.get_bad_url():
+            if "banner" in s:
+                bad_banners[s.split("/")[-3]].append(s.split("/")[-1])
+            if "logo.png" in s:
+                bad_banners[s.split("/")[-5]].append(s.split("/")[-2][:-3] + "logo.png")
+        return bad_banners
+    
+    @check_initialized
+    async def get_data(self, gacha_id: str) -> dict:
+        with open(os.path.abspath(f"./data/gacha/data/{gacha_id}.json"), 'r', encoding="UTF-8") as f: 
+            data: dict = json.load(f)
+        return data
+    
+    @check_initialized
+    async def get_summary_data(self) -> dict:
+        return self.__summary_data__
+    
+    @check_initialized
+    async def get_details(self, gacha_id: str) -> list:
+        return (await self.get_data(gacha_id))["details"]
+    
+    @check_initialized
+    async def get_rates(self, gacha_id: str) -> list:
+        return (await self.get_data(gacha_id))["rates"]
+    
+    @check_initialized
+    async def get_payment_methods(self, gacha_id: str) -> dict:
+        return (await self.get_data(gacha_id))["paymentMethods"][0]
+    
+    @check_initialized
+    async def get_gacha_name(self, gacha_id: str) -> list:
+        return (await self.get_data(gacha_id))["gachaName"]
+    
+    @check_initialized
+    async def get_published_at(self, gacha_id: str) -> list:
+        return (await self.get_data(gacha_id))["publishedAt"]
+    
+    @check_initialized
+    async def get_closed_at(self, gacha_id: str) -> list:
+        return (await self.get_data(gacha_id))["closedAt"]
+
+    @check_initialized
+    async def get_description(self, gacha_id: str) -> list:
+        return (await self.get_data(gacha_id))["description"]
+    
+    @check_initialized
+    async def get_annotation(self, gacha_id: str) -> list:
+        return (await self.get_data(gacha_id))["annotation"]
+    
+    @check_initialized
+    async def get_gacha_period(self, gacha_id: str) -> list:
+        return (await self.get_data(gacha_id))["gachaPeriod"]
+    
+    @check_initialized
+    async def get_type(self, gacha_id: str) -> str:
+        data = await self.get_data(gacha_id)
+        return self._types[data["type"] or data["gachaType"]]
+    
+    @check_initialized
+    async def get_new_cards(self, gacha_id: str) -> str:
+        return (await self.get_data(gacha_id))["newCards"]
+    
+    @check_initialized
+    async def get_information(self, gacha_id: str) -> dict:
+        '''
+        获取关于招募的详细信息  
+
+        return: 包含`description`, `term`, `newMemberInfo`, `notice` 四个键的字典，值均为列表
+        '''
+        return (await self.get_data(gacha_id))["information"]
+    
+    @check_initialized
+    async def get_banner(self, gacha_id: str) -> Image.Image:
+        async def get_res_name(data: dict):
+            return data.get("bannerAssetBundleName", f"{data['resourceName']}_icon")
+        
+        data = await self.get_data(gacha_id)
+        jp_path = os.path.abspath(f"./data/gacha/banners/jp/{await get_res_name(data)}.png")
+        cn_path = os.path.abspath(f"./data/gacha/banners/cn/{await get_res_name(data)}.png")
         if os.path.exists(cn_path):
             return Image.open(cn_path).convert("RGBA")
         return Image.open(jp_path).convert("RGBA")
@@ -1276,7 +1560,9 @@ class Data(object):
         self.degree = _Degree()
         self.areaitem = _AreaItem()
         self.event = _Event()
+        self.gacha = _Gacha()
         await self.card.initialize()
+        await self.gacha.initialize()
         await self.event.initialize()
         await self.skill.initialize()
         await self.areaitem.initialize()
@@ -1352,12 +1638,22 @@ class Data(object):
         return stats
     
     async def get_event_id(self, card_id: int, server_id: int):
+        '''
+        通过 card_id 匹配 event_id
+        '''
         if card_id > 5000:
             return None
         released_at = await self.card.get_released_at(card_id)
         for event_id, data in (await self.event.get_summary_data()).items():
             if data["startAt"][server_id] == released_at[server_id] and released_at[server_id] is not None:
                 return event_id
+            
+    async def get_gacha_id(self, card_id: int, server_id: int = JP):
+        source = (await self.card.get_source(card_id))[server_id].get("gacha", {})
+        try:
+            return [gacha_id for gacha_id in source if gacha_id][0]
+        except IndexError:
+            return None
             
 data = Data()
 
@@ -1634,7 +1930,7 @@ class Card(object):
             return result
 
         event_type = await data.event.get_event_type(event_id)
-        event_info = f"{await data.event.get_type_nickname(event_type)} | {' '.join(await data.event.get_servers(event_id))} | ID: {event_id}".strip()
+        event_info = f"{await data.event.get_type_nickname(event_type)}   ID: {event_id} ({', '.join(await data.event.get_servers(event_id))})".strip()
         event_banner = await data.event.get_banner(event_id)
         event_attributes = await data.event.get_attributes(event_id)
         event_characters = await data.event.get_characters(event_id)
@@ -1643,7 +1939,9 @@ class Card(object):
 
         font = get_font("grpcn", 32)
 
-        addition_imgs = [event_banner.resize((1006, event_banner.height * 1006 // event_banner.width), Image.Resampling.BICUBIC), ImageUtils.text2img(event_info, {"width": int(font.getlength(event_info)) + 32, "x_padding": 0, "y_padding": 0, "bg_fill": (0, 0, 0, 0), "font": font})]
+        banner = event_banner.resize((1006, event_banner.height * 1006 // event_banner.width), Image.Resampling.BICUBIC)
+
+        addition_imgs = [ImageUtils.text2img(event_info, {"width": int(font.getlength(event_info)) + 32, "x_padding": 0, "y_padding": 0, "bg_fill": (0, 0, 0, 0), "font": font})]
         for percent, attributes in attribute_addition.items():
             addition_imgs.append(
                 ImageUtils.merge_images(
@@ -1661,9 +1959,37 @@ class Card(object):
             )
         
         addition_img = ImageUtils.merge_images(addition_imgs, "v", 12, 0, 0, (0, 0, 0, 0))
+        addition_img = ImageUtils.paste(Image.new("RGBA", (addition_img.width, addition_img.height + 8), (0, 0, 0, 0)), addition_img, (0, 0))
+
+        grey_line = Image.new("RGBA", (16, addition_img.height), (0, 0, 0, 0))
+        grey_line.paste(Image.new("RGBA", (6, addition_img.height), (190, 190, 190)), (12, 0))
+
+        addition_img = ImageUtils.merge_images([grey_line, addition_img], "h", 8, 0, 0, (0, 0, 0, 0))
+        addition_img = ImageUtils.merge_images([banner, addition_img], "v", 12, 0, 0, (0, 0, 0, 0))
 
         return ImageUtils.paste(Image.new("RGBA", addition_img.size, (255, 255, 255)), addition_img, (0, 0))
     
+    async def make_gacha(self, gacha_id: str):
+        banner = await data.gacha.get_banner(gacha_id)
+        gacha_type = await data.gacha.get_type(gacha_id)
+        font = get_font("grpcn", 32)
+
+        info_img = ImageUtils.text2img(f"{gacha_type}   ID: {gacha_id}", {"width": int(font.getlength(f"{gacha_type} | ID {gacha_id}")) + 32, "x_padding": 0, "y_padding": 0, "fill": (80, 80, 80), "bg_fill": (0, 0, 0, 0), "font": font})
+
+        grey_line = Image.new("RGBA", (16, info_img.height + 2), (0, 0, 0, 0))
+        grey_line.paste(Image.new("RGBA", (6, info_img.height + 2), (190, 190, 190)), (12, 0))
+
+        info_img = ImageUtils.merge_images([grey_line, info_img], "h", 8, 0, 0, (0, 0, 0, 0))
+
+        img = ImageUtils.merge_images(
+            [
+                banner.resize((1006, banner.height * 1006 // banner.width), Image.Resampling.BICUBIC),
+                info_img
+            ], "v", 6, 0, 0, (0, 0, 0, 0)
+        )
+
+        return ImageUtils.paste(Image.new("RGBA", img.size, (255, 255, 255)), img, (0, 0)) 
+
     async def get_card(self, id: int) -> Image.Image:
         _data: dict = await data.card.get_data(id)
 
@@ -1685,6 +2011,7 @@ class Card(object):
         imgs.append(base)
 
         jp_event_id, cn_event_id = await data.get_event_id(id, JP), await data.get_event_id(id, CN)
+        jp_gacha_id, cn_gacha_id = await data.get_gacha_id(card_id=id, server_id=JP), await data.get_gacha_id(card_id=id, server_id=CN)
 
         if cn_event_id or jp_event_id:
             title = ImageUtils.add_circle_corn(Image.new("RGBA", (320, 64), (234, 78, 115)), 16, (234, 78, 115), (255, 255, 255), frame_width=6)
@@ -1692,13 +2019,19 @@ class Card(object):
             event_img = ImageUtils.add_circle_corn(await self.make_event(cn_event_id or jp_event_id), 16, frame_width=4, frame_color=(255, 255, 255))
             imgs.append(ImageUtils.merge_images([title, event_img], "v", -25, 0, 0, (0, 0, 0, 0)))
 
+        if cn_gacha_id or jp_gacha_id:
+            title = ImageUtils.add_circle_corn(Image.new("RGBA", (320, 64), (234, 78, 115)), 16, (234, 78, 115), (255, 255, 255), frame_width=6)
+            title = ImageUtils.text(title, (int((320 + 32 - get_font("grpcn", 42).getlength("相关卡池")) // 2), 12), "相关卡池", (255, 255, 255), get_font("grpcn", 42))
+            gacha_img = ImageUtils.add_circle_corn(await self.make_gacha(cn_gacha_id or jp_gacha_id), 16, frame_width=4, frame_color=(255, 255, 255))
+            imgs.append(ImageUtils.merge_images([title, gacha_img], "v", -25, 0, 0, (0, 0, 0, 0)))
+
         img = ImageUtils.merge_images(imgs, "v", 32, 0, 0, (0, 0, 0, 0))
-        bg = ImageUtils.merge_images((await data.card.get_res(id)).values(), "v", 0, 0, 0).resize((img.width + 64, 1334 // 1002 * img.width), Image.Resampling.BICUBIC)
-        result = Image.new("RGBA", (img.width + 64, img.height + 64), (255, 255, 255))
-        for i in range(0, img.height // bg.height + 1):
-            result.paste(bg, (0, bg.height * i))
+        if FANCY_BG:
+            bg = ImageUtils.make_bg(ImageUtils.merge_images((await data.card.get_res(id)).values(), "v", 0, 0, 0).resize((img.width + 64, 2 * 1334 // 1002 * img.width), Image.Resampling.BICUBIC), (img.width + 64, img.height + 64)).filter(ImageFilter.GaussianBlur(radius=6))
+        else:
+            bg = ImageUtils.make_bg(Image.open(os.path.abspath(f"data/bg/bg_{await data.card.get_band_id(id)}.png")).convert("RGBA"), (img.width + 64, img.height + 64))
         
-        return ImageUtils.paste(result.filter(ImageFilter.GaussianBlur(radius=4)), img, (32, 32))
+        return ImageUtils.paste(bg, img, (32, 32))
     
     async def adjust_list(self, obj):
         """
@@ -1821,10 +2154,14 @@ class Card(object):
 card = Card()
 
 
+class Event(object):
+    def __init__(self) -> None:
+        pass
+
+    
+
 class PlayerState(object):
     def __init__(self) -> None:
-        logger.info("STATE: 字体加载成功")
-
         self.music_nickname2bdname = {
             "cleared": "clearedMusicCountMap",
             "full_combo": "fullComboMusicCountMap",
@@ -1841,7 +2178,6 @@ class PlayerState(object):
             "full_combo": Image.open(os.path.abspath(f'./data/bg/music_full_combo.png')).convert("RGBA"),
             "all_perfect": Image.open(os.path.abspath(f'./data/bg/music_all_perfect.png')).convert("RGBA")
         }
-        logger.info("STATE: 资源加载成功")
 
     def to_width(self, string: str, font: ImageFont.ImageFont) -> int:
         return math.ceil(font.getlength(string))
@@ -1873,7 +2209,7 @@ class PlayerState(object):
             degrees.append((await data.degree.get_degree(str(_data["data"]["profile"]["userProfileDegreeMap"]["entries"]["second"]["degreeId"]), type)).resize((401, 87), Image.Resampling.LANCZOS))
         for i,v in enumerate(degrees):
             im = ImageUtils.paste(im, v, (40 + i * 417, 164))
-        return im.crop((0, 36, 1086, 347))
+        return im
     
     async def make_simple_info_img(self, _data: dict, type: str) -> Image.Image:
         '''
@@ -1997,13 +2333,15 @@ class PlayerState(object):
         '''
         imgs = []
         if _data["data"]["profile"].get("userProfileSituation") and _data["data"]["profile"].get("userProfileDegreeMap"):
-            imgs.append(await self.make_info_img(_data, type))
+            info_img = await self.make_info_img(_data, type)
         else:
-            imgs.append(await self.make_simple_info_img(_data, type))
+            info_img = await self.make_simple_info_img(_data, type)
+
         if _data["data"]["profile"]["publishTotalDeckPowerFlg"]:
             imgs.append(await self.make_total_desk_power_img(_data))
         if _data["data"]["profile"]["publishBandRankFlg"]:
             imgs.append(await self.make_band_rank_img(_data))
+
         if type == "jp":
             music__data = await self.trans_jp_music_to_cn(_data["data"]["profile"])
             if music__data.get("clearedMusicCountMap"):
@@ -2012,6 +2350,7 @@ class PlayerState(object):
                 _data["data"]["profile"]["fullComboMusicCountMap"] = music__data.get("fullComboMusicCountMap")
             if music__data.get("allPerfectMusicCountMap"):
                 _data["data"]["profile"]["allPerfectMusicCountMap"] = music__data.get("allPerfectMusicCountMap")
+
         if _data["data"]["profile"]["publishMusicClearedFlg"]:
             imgs.append(await self.make_music_img(_data, "cleared"))
         if _data["data"]["profile"]["publishMusicFullComboFlg"]:
@@ -2019,7 +2358,12 @@ class PlayerState(object):
         if _data["data"]["profile"]["publishMusicAllPerfectFlg"]:
             imgs.append(await self.make_music_img(_data, "all_perfect"))
 
-        result = ImageUtils.merge_images(imgs, "v", 8, 0, 32, (255, 255, 255, 255))
+        info_img = ImageUtils.add_circle_corn(info_img, frame_color=(240, 240, 240), frame_width=2, radius=16)
+        img = ImageUtils.add_circle_corn(ImageUtils.merge_images(imgs, "v", 8, 0, 32, (255, 255, 255, 255)), frame_color=(240, 240, 240), frame_width=2, radius=16)
+        result = ImageUtils.merge_images([info_img, img], "v", 32, 0, 0, (0, 0, 0, 0))
+        bg = ImageUtils.make_bg(Image.open(os.path.abspath("data/bg/bg_pattern_icon.png")).convert("RGBA"), (result.width + 64, result.height + 64))
+        result = ImageUtils.paste(bg, result, (32, 32))
+
         draw = ImageDraw.Draw(result)
 
         dt = datetime.datetime.fromtimestamp(_data['data']['time'] / 1000)
