@@ -2360,8 +2360,11 @@ class PlayerState(object):
             imgs.append(await self.make_music_img(_data, "all_perfect"))
 
         info_img = ImageUtils.add_circle_corn(info_img, frame_color=(240, 240, 240), frame_width=2, radius=16)
-        img = ImageUtils.add_circle_corn(ImageUtils.merge_images(imgs, "v", 8, 0, 32, (255, 255, 255, 255)), frame_color=(240, 240, 240), frame_width=2, radius=16)
-        result = ImageUtils.merge_images([info_img, img], "v", 32, 0, 0, (0, 0, 0, 0))
+        if imgs:
+            img = ImageUtils.add_circle_corn(ImageUtils.merge_images(imgs, "v", 8, 0, 32, (255, 255, 255, 255)), frame_color=(240, 240, 240), frame_width=2, radius=16)
+            result = ImageUtils.merge_images([info_img, img], "v", 32, 0, 0, (0, 0, 0, 0))
+        else:
+            result = info_img
         bg = ImageUtils.make_bg(Image.open(os.path.abspath("data/bg/bg_pattern_icon.png")).convert("RGBA"), (result.width + 64, result.height + 64))
         result = ImageUtils.paste(bg, result, (32, 32))
 
