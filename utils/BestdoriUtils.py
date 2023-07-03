@@ -197,6 +197,29 @@ class Download(object):
 download = Download()
 
 
+class BestdoriImageUtils(ImageUtils):
+    '''
+    功能拓展
+    '''
+
+    @staticmethod
+    def text_two_sides(text_l: str, text_r: str, width: int, x_padding: int, y_padding: int, text_color: tuple, bg_color: tuple, font: ImageFont.ImageFont):
+        height = font.getbbox(text_l + text_r)[3] + y_padding * 2
+        result = Image.new("RGBA", (width, height), bg_color)
+        draw = ImageDraw.Draw(result)
+        draw.text((x_padding, y_padding), text_l, text_color, font)
+        draw.text((width - x_padding - font.getlength(text_r), y_padding), text_r, text_color, font)
+        return result
+    
+    @staticmethod
+    def make_side_line(img: Image.Image, line_color: tuple = (190, 190, 190), bg_color: tuple = (255, 255, 255), line_width: int = 6, line_padding: int = 6, spacing: int = 6) -> Image.Image:
+        result = Image.new("RGBA", (line_width + spacing + img.width, img.height + line_padding * 2), bg_color)
+        line = Image.new("RGBA", (line_width, img.height + line_padding * 2), line_color)
+        result = ImageUtils.paste(result, line, (0, 0))
+        result = ImageUtils.paste(result, img, (line.width + spacing, line_padding))
+        return result
+
+
 if USE_CACHE:
     logger.info("GLOBAL: 将使用CACHE")
 else:
@@ -218,6 +241,9 @@ def get_font(name: str, size: int):
         "default": os.path.abspath("data/fonts/default.ttf")
     }
     return ImageFont.truetype(path[name], size)
+
+def get_able_element(l: list):
+    return l[CN] or l[JP] or l[TW] or l[EN] or l[KR]
 
 def check_initialized(func):
     '''
@@ -533,9 +559,9 @@ class _Card:
             'limited': ["期间限定", "限定", "限定卡面", "期间限定卡面"], 
             'campaign': ["联名合作", "联动", "联名合作卡面", "联动卡面"], 
             'others': ["其它", "其他", "其他卡面"], 
-            'dreamfes': ["dfes", "梦限", "dreamfes", "fes"], 
+            'dreamfes': ["梦想Fes限定", "dfes", "梦限", "dreamfes", "fes"], 
             'birthday': ["生日", "birth", "生日卡", "birthday"], 
-            'kirafes': ["kfes", "kirafes", "闪限", "fes"],
+            'kirafes': ["闪光Fes限定", "kfes", "kirafes", "闪限", "fes"],
         }
 
         self.band_list = [x for v in self.band2name.values() for x in v]
@@ -590,6 +616,13 @@ class _Card:
         获取卡牌对应的类型
         '''
         return (await self.get_data(card_id))["type"]
+    
+    @check_initialized
+    async def get_type_in_chinese(self, card_id: int) -> str:
+        '''
+        获取卡牌对应类型的中文描述
+        '''
+        return self.chinese2type[await self.get_type(card_id)][0]
 
     @check_initialized
     async def get_level_limit(self, card_id: int) -> int:
@@ -1269,6 +1302,10 @@ class _Event:
     
     @check_initialized
     async def get_event_start_time(self, event_id: str) -> list:
+        '''
+        获取活动开始时间的中文描述
+        此函数获取的不是时间戳！时间戳请使用`get_start_at`
+        '''
         async def timestamp_to_datetime(timestamp: int) -> str:
             if timestamp:
                 timestamp = int(timestamp) / 1000  # 转换为秒级时间戳
@@ -1278,7 +1315,23 @@ class _Event:
             
         start_at = await self.get_start_at(event_id)
         return [await timestamp_to_datetime(i) + [" (JP)", " (EN)", " (TW)", " (CN)", " (KR)"][idx] for idx, i in enumerate(start_at) if (i and idx in [0, 3]) or (i and idx == 2 and not start_at[JP])]
-    
+
+    @check_initialized
+    async def get_event_end_time(self, event_id: str) -> list:
+        '''
+        获取活动结束时间的中文描述
+        此函数获取的不是时间戳！时间戳请使用`get_end_at`
+        '''
+        async def timestamp_to_datetime(timestamp: int) -> str:
+            if timestamp:
+                timestamp = int(timestamp) / 1000  # 转换为秒级时间戳
+                dt = datetime.datetime.fromtimestamp(timestamp)
+                chinese_datetime = dt.strftime("%Y年%#m月%#d日, %I:%M %p")
+                return chinese_datetime
+            
+        end_at = await self.get_end_at(event_id)
+        return [await timestamp_to_datetime(i) + [" (JP)", " (EN)", " (TW)", " (CN)", " (KR)"][idx] for idx, i in enumerate(end_at) if (i and idx in [0, 3]) or (i and idx == 2 and not end_at[JP])]
+
     @check_initialized
     async def get_servers(self, event_id: str) -> list:
         start_at = await self.get_start_at(event_id)
@@ -1303,6 +1356,10 @@ class _Event:
     @check_initialized
     async def get_reward_cards(self, event_id: str) -> list:
         return self.__summary_data__[event_id]["rewardCards"]
+    
+    @check_initialized
+    async def get_event_type_nickname(self, event_id: str) -> str:
+        return await self.get_type_nickname(await self.get_event_type(event_id))
     
     async def get_type_nickname(self, type: str) -> str:
         return self._types[type]
@@ -1537,7 +1594,7 @@ class _Gacha:
     @check_initialized
     async def get_banner(self, gacha_id: str) -> Image.Image:
         async def get_res_name(data: dict):
-            return data.get("bannerAssetBundleName", f"{data['resourceName']}_icon")
+            return data.get("bannerAssetBundleName", f"{data['resourceName']}_logo")
         
         data = await self.get_data(gacha_id)
         jp_path = os.path.abspath(f"./data/gacha/banners/jp/{await get_res_name(data)}.png")
@@ -1643,18 +1700,38 @@ class Data(object):
         '''
         if card_id > 5000:
             return None
+        
         released_at = await self.card.get_released_at(card_id)
         for event_id, data in (await self.event.get_summary_data()).items():
             if data["startAt"][server_id] == released_at[server_id] and released_at[server_id] is not None:
                 return event_id
             
     async def get_gacha_id(self, card_id: int, server_id: int = JP):
+        '''
+        通过 `card_id` 匹配 `gacha_id`
+        '''
         source = (await self.card.get_source(card_id))[server_id].get("gacha", {})
         data = await self.gacha.get_summary_data()
         try:
             return [gacha_id for gacha_id in source if gacha_id and data[gacha_id]["type"] != "free" and int((await self.card.get_released_at(card_id))[server_id]) <= int(data[gacha_id]["publishedAt"][server_id])][0]
         except IndexError:
             return None
+        
+    async def get_gacha_id_with_event_id(self, event_id: str, server_id: int = JP) -> list:
+        '''
+        通过 `event_id` 匹配 `gacha_id`
+        '''
+        result = []
+        event_s = int((await self.event.get_start_at(event_id))[server_id] or -1)
+        event_e = int((await self.event.get_end_at(event_id))[server_id] or -1)
+
+        for gacha_id, gacha_data in (await self.gacha.get_summary_data()).items():
+            gacha_s = int(gacha_data["publishedAt"][server_id] or -1)
+            gacha_e = int(gacha_data["closedAt"][server_id] or -1)
+            if event_s <= gacha_e and event_e >= gacha_s:
+                result.append(gacha_id)
+
+        return result
             
 data = Data()
 
@@ -1718,7 +1795,10 @@ class Card(object):
         生成卡面双图
         `card_id`: 卡面id
         '''
-        font = get_font("ksm", 28)
+        font = get_font("grpcn", 28)
+        fallback_font = get_font("ksm", 28)
+        bg_color = (255, 255, 255, 255)
+        frame_color = (230, 230, 230, 255)
 
         def to_width(string: str) -> int:
             return math.ceil(font.getlength(string))
@@ -1731,20 +1811,24 @@ class Card(object):
         for k, v in thumbs.items():
             thumbnails.append(await self.make_thumb_card(card_id, v, k=="trained"))
             
-        img = Image.new("RGBA", (data.card.thumb_bg.getbbox()[2], data.card.thumb_bg.getbbox()[3]))
-        img.paste(data.card.thumb_bg, (0,0), data.card.thumb_bg.split()[3])
+        img = ImageUtils.add_circle_corn(Image.new("RGBA", (420, 280), bg_color), frame_color=frame_color, frame_width=4)
 
         if len(thumbnails) == 1:
-            img.paste(thumbnails[0], ((img.getbbox()[2] - thumbnails[0].getbbox()[2])//2, (data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[0].split()[3])
+            img.paste(thumbnails[0], ((img.getbbox()[2] - thumbnails[0].getbbox()[2])//2, (img.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[0].split()[3])
         else:
-            img.paste(thumbnails[1], ((data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3, (data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[1].split()[3])
-            img.paste(thumbnails[0], ((data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3 * 2 + thumbnails[0].getbbox()[2], (data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[0].split()[3])
+            img.paste(thumbnails[1], ((img.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3, (img.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[1].split()[3])
+            img.paste(thumbnails[0], ((img.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3 * 2 + thumbnails[0].getbbox()[2], (img.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3), mask = thumbnails[0].split()[3])
 
         draw = ImageDraw.Draw(img)
-        x, y = (img.getbbox()[2] - to_width(prefix))//2, data.card.thumb_bg.getbbox()[3] - (data.card.thumb_bg.getbbox()[3] - (data.card.thumb_bg.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3 - thumbnails[0].getbbox()[3])//2 - 28
-        draw.text((x, y - 14), prefix, font=font, fill=(0,0,0))
+        x, y = (img.getbbox()[2] - to_width(prefix))//2, img.getbbox()[3] - (img.getbbox()[3] - (img.getbbox()[2] - 2*thumbnails[0].getbbox()[2])//3 - thumbnails[0].getbbox()[3])//2 - 28
+        if "・" in prefix:
+            img = ImageUtils.text(img, (x, y - 8), prefix, (84, 84, 84), font, fallback_font, -7, 0)
+        else:
+            img = ImageUtils.text(img, (x, y - 8), prefix, (84, 84, 84), font, fallback_font, -2, -4)
+
+        info = f'{card_id} | {await data.card.get_type_in_chinese(card_id)}'
         
-        draw.text(((img.getbbox()[2] - to_width(f'{card_id} | {await data.card.get_type(card_id)}'))//2, y + 22), f'{card_id} | {await data.card.get_type(card_id)}', font=font, fill=(0,0,0))
+        draw.text(((img.getbbox()[2] - to_width(info))//2, y + 22), info, font=font, fill=(80, 80, 80))
         
         return img
 
@@ -1758,24 +1842,16 @@ class Card(object):
             if len(i) > max_lenth:
                 max_lenth = len(i)
 
-        bg_p = Image.open(os.path.abspath("data/bg/bg_pattern.png"))
+        bg_p = Image.open(os.path.abspath("data/bg/bg_1.png")).convert("RGBA")
 
-        W, H  = data.card.thumb_bg.getbbox()[2], data.card.thumb_bg.getbbox()[3]
+        sample_img = thumb_cards[0][0]
 
-        # 生成背景
+        W, H  = sample_img.getbbox()[2], sample_img.getbbox()[3]
+
         width = 36*2 + len(thumb_cards) * W + (len(thumb_cards) - 1) * 48
         height = 36*2 + max_lenth * H + (max_lenth - 1) * 32
-        (width_p, height_p) = bg_p.size     #用来拼合的图片的长宽
-        width_num = math.ceil(width/width_p)    #拼合的行数和列数（向上取整）
-        height_num = math.ceil(height/height_p)
-        result_width = width_p * width_num
-        result_height = height_p * height_num
-        bg = Image.new('RGBA', (result_width, result_height))
-        for i in range(width_num):
-            for j in range(height_num):
-                bg.paste(bg_p, (i*width_p, j*height_p))     #先拼出来一张比要生成的图片的长宽都稍微大一点的背景
 
-        im = bg.crop((0, 0, width, height))
+        im = ImageUtils.make_bg(bg_p, (width, height))
 
         for idx_i,i in enumerate(thumb_cards):
             for idx_j,j in enumerate(i):
@@ -2158,8 +2234,66 @@ card = Card()
 class Event(object):
     def __init__(self) -> None:
         pass
-
     
+    async def make_info(self, event_id: str) -> Image.Image:
+        async def transform_event_attributes(data):
+            result = {}
+            for item in data:
+                attribute = item["attribute"]
+                percent = item["percent"]
+                if percent not in result:
+                    result[percent] = []
+                result[percent].append(attribute)
+            return result
+        
+        async def transform_event_characters(data):
+            result = {}
+            for item in data:
+                characterId = item["characterId"]
+                percent = item["percent"]
+                if percent not in result:
+                    result[percent] = []
+                result[percent].append(characterId)
+            return result
+        
+        font = get_font("grpcn", 32)
+        banner = await data.event.get_banner(event_id)
+        event_name = get_able_element(await data.event.get_event_name(event_id))
+        event_type = await data.event.get_event_type_nickname(event_id)
+        event_start_time = await data.event.get_event_start_time(event_id)
+        event_start_time_cn, event_start_time_jp = event_start_time[CN], event_start_time[JP]
+        event_start_time = f'{event_start_time_cn or ""} {event_start_time_jp or ""}'.strip()
+        event_end_time = await data.event.get_event_end_time(event_id)
+        event_end_time_cn, event_end_time_jp = event_end_time[CN], event_end_time[JP]
+        event_end_time = f'{event_end_time_cn or ""} {event_end_time_jp or ""}'.strip()
+        event_attributes = await data.event.get_attributes(event_id)
+        event_characters = await data.event.get_characters(event_id)
+        attribute_addition = await transform_event_attributes(event_attributes)
+        character_addition = await transform_event_characters(event_characters)
+        reward_cards = await data.event.get_reward_cards(event_id)
+
+        addition_imgs =[]
+        for percent, attributes in attribute_addition.items():
+            addition_imgs.append(
+                ImageUtils.merge_images(
+                    [ImageUtils.merge_images([data.card.attribute_thumb_img[attribute] for attribute in attributes], "h", 0, 0, 0, (0, 0, 0, 0)), ImageUtils.text2img(f" + {percent}%", {"width": int(font.getlength(f" + {percent}%")) + 32, "x_padding": 0, "y_padding": 0, "fill": (80, 80, 80), "bg_fill": (0, 0, 0, 0), "font": font})],
+                    "h", 0, 0, 0, (0, 0, 0, 0)
+                )
+            )
+        for percent, characters in character_addition.items():
+            addition_imgs.append(
+                ImageUtils.merge_images(
+                    [ImageUtils.merge_images([(await data.card.get_chara_icon(character)).resize((45, 45), Image.Resampling.BICUBIC) for character in characters], "h", 0, 0, 0, (0, 0, 0, 0)), ImageUtils.text2img(f" + {percent}%", {"width": int(font.getlength(f" + {percent}%")) + 32, "x_padding": 0, "y_padding": 0, "fill": (80, 80, 80), "bg_fill": (0, 0, 0, 0), "font": font})],
+                    "h", 0, 0, 0, (0, 0, 0, 0)
+                )
+            )
+        addition_img = ImageUtils.merge_images(addition_imgs, "v", 12, 0, 0, (0, 0, 0, 0))
+        addition_img = BestdoriImageUtils.make_side_line(addition_img)
+
+        title_img = BestdoriImageUtils.text_two_sides("标题", event_name, banner.width, 6, 0, (80, 80, 80), (255, 255, 255), font)
+        type_img = BestdoriImageUtils.text_two_sides("类型", event_type, banner.width, 6, 0, (80, 80, 80), (255, 255, 255), font)
+        start_time_img = BestdoriImageUtils.text_two_sides("开始时间", event_start_time, banner.width, 6, 0, (80, 80, 80), (255, 255, 255), font)
+        end_time_img = BestdoriImageUtils.text_two_sides("结束时间", event_end_time, banner.width, 6, 0, (80, 80, 80), (255, 255, 255), font)
 
 class PlayerState(object):
     def __init__(self) -> None:
@@ -2359,13 +2493,17 @@ class PlayerState(object):
         if _data["data"]["profile"]["publishMusicAllPerfectFlg"]:
             imgs.append(await self.make_music_img(_data, "all_perfect"))
 
-        info_img = ImageUtils.add_circle_corn(info_img, frame_color=(240, 240, 240), frame_width=2, radius=16)
+        info_img = ImageUtils.add_circle_corn(info_img, frame_color=(240, 240, 240), frame_width=4, radius=16)
         if imgs:
-            img = ImageUtils.add_circle_corn(ImageUtils.merge_images(imgs, "v", 8, 0, 32, (255, 255, 255, 255)), frame_color=(240, 240, 240), frame_width=2, radius=16)
+            img = ImageUtils.add_circle_corn(ImageUtils.merge_images(imgs, "v", 8, 0, 32, (255, 255, 255, 255)), frame_color=(240, 240, 240), frame_width=4, radius=16)
             result = ImageUtils.merge_images([info_img, img], "v", 32, 0, 0, (0, 0, 0, 0))
         else:
             result = info_img
-        bg = ImageUtils.make_bg(Image.open(os.path.abspath("data/bg/bg_pattern_icon.png")).convert("RGBA"), (result.width + 64, result.height + 64))
+
+        card_id = _data["data"]["profile"]["userProfileSituation"]["situationId"] or 1
+        band_id = await data.card.get_band_id(card_id)
+
+        bg = ImageUtils.make_bg(Image.open(os.path.abspath(f"data/bg/bg_{band_id}.png")).convert("RGBA"), (result.width + 64, result.height + 64))
         result = ImageUtils.paste(bg, result, (32, 32))
 
         draw = ImageDraw.Draw(result)
@@ -2388,7 +2526,7 @@ class PlayerState(object):
                 _data = await response.text()
                 _data = json.loads(_data)
         result = await self.init_img(uid, _data, type)
-        result.paste(data.card.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=data.card.watermark.split()[3])
+        # result.paste(data.card.watermark, box=(result.getbbox()[2] - 193, result.getbbox()[3] - 24), mask=data.card.watermark.split()[3])
         return result
 
 player_state = PlayerState()
